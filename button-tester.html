@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Arcade Button Tester</title>
+<style>
+body{
+  margin:0;
+  padding:40px;
+  background:#000;
+  color:#0f0;
+  font-family:monospace;
+  font-size:20px;
+}
+h1{
+  color:#0ff;
+  text-align:center;
+  font-size:48px;
+  margin-bottom:40px;
+}
+.instructions{
+  color:#ff0;
+  font-size:24px;
+  margin-bottom:30px;
+  text-align:center;
+}
+#output{
+  max-width:1200px;
+  margin:0 auto;
+}
+.button{
+  margin:5px 0;
+  padding:15px;
+  background:#111;
+  border:2px solid #0f0;
+  border-radius:5px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.button.pressed{
+  background:#0f0;
+  color:#000;
+  font-weight:bold;
+  border-color:#0ff;
+  box-shadow:0 0 20px #0f0;
+  animation:pulse 0.3s;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.05);}
+}
+.button-label{
+  font-size:24px;
+}
+.button-value{
+  font-size:18px;
+}
+.highlight{
+  color:#f0f;
+  font-weight:bold;
+  font-size:28px;
+}
+.axes{
+  margin-top:40px;
+  padding-top:40px;
+  border-top:2px solid #0f0;
+}
+</style>
+</head>
+<body>
+<h1>🎮 ARCADE BUTTON TESTER</h1>
+<div class="instructions">
+  Press buttons on your arcade cabinet to see their numbers<br>
+  <span class="highlight">Look for K2 (COIN) and K3 (START) buttons!</span>
+</div>
+<div id="output"></div>
+
+<script>
+const output = document.getElementById('output');
+let lastPressed = [];
+
+function updateGamepad(){
+  const gp = navigator.getGamepads()[0];
+  if(!gp){
+    output.innerHTML = '<div class="button"><div class="button-label">No gamepad detected</div><div class="button-value">Please connect and press a button</div></div>';
+    return;
+  }
+  
+  let html = '<div style="color:#0ff; font-size:28px; margin-bottom:20px; text-align:center;">Gamepad: ' + gp.id + '</div>';
+  
+  // Track which buttons are currently pressed
+  const currentPressed = [];
+  
+  gp.buttons.forEach((btn, i) => {
+    const pressed = btn.pressed ? ' pressed' : '';
+    const label = getButtonLabel(i);
+    html += `<div class="button${pressed}">
+      <div class="button-label">Button ${i}${label}</div>
+      <div class="button-value">${btn.pressed ? '🔥 PRESSED!' : 'Not pressed'}</div>
+    </div>`;
+    
+    if(btn.pressed && !lastPressed.includes(i)){
+      console.log(`Button ${i} pressed${label}`);
+      currentPressed.push(i);
+    }
+  });
+  
+  lastPressed = currentPressed;
+  
+  // Show axes
+  html += '<div class="axes"><div style="color:#0ff; font-size:24px; margin-bottom:15px;">Joystick Axes:</div>';
+  gp.axes.forEach((axis, i) => {
+    const val = axis.toFixed(3);
+    const moving = Math.abs(axis) > 0.2 ? ' pressed' : '';
+    html += `<div class="button${moving}">
+      <div class="button-label">Axis ${i} ${getAxisLabel(i)}</div>
+      <div class="button-value">${val}</div>
+    </div>`;
+  });
+  html += '</div>';
+  
+  output.innerHTML = html;
+}
+
+function getButtonLabel(i){
+  const labels = {
+    0: ' (❌)',
+    1: ' (🔴)',
+    2: ' (⬜)',
+    3: ' (🔺)',
+    4: ' (Top)',
+    5: ' (Left)',
+    6: ' (Right)',
+    7: ' (Down)',
+    8: ' (SE?)',
+    9: ' (ST?)',
+    10: ' (K3/Start?)',
+    11: ' (K3/Start?)',
+    12: ' (K2/Coin?)',
+    13: ' (K2/Coin?)',
+  };
+  return labels[i] || '';
+}
+
+function getAxisLabel(i){
+  const labels = {
+    0: ' (Left/Right)',
+    1: ' (Up/Down)',
+  };
+  return labels[i] || '';
+}
+
+setInterval(updateGamepad, 50);
+</script>
+</body>
+</html>

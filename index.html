@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ARCADE GAME SELECTION</title>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background: linear-gradient(135deg, #0A0A0F 0%, #1A1A2E 50%, #0A0A0F 100%);
+  overflow:hidden;
+  font-family: 'Courier New', monospace;
+  height:100vh;
+}
+#container{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+  padding:40px;
+}
+.title{
+  font-size:64px;
+  font-weight:bold;
+  color:#00F5FF;
+  text-shadow: 0 0 30px #00F5FF, 0 0 60px #00F5FF;
+  margin-bottom:20px;
+  text-align:center;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+@keyframes glow{
+  from{text-shadow: 0 0 20px #00F5FF, 0 0 40px #00F5FF;}
+  to{text-shadow: 0 0 30px #00F5FF, 0 0 70px #00F5FF, 0 0 100px #00F5FF;}
+}
+.subtitle{
+  font-size:24px;
+  color:#9D4EDD;
+  text-shadow: 0 0 10px #9D4EDD;
+  margin-bottom:60px;
+  text-align:center;
+}
+.games{
+  display:flex;
+  gap:60px;
+  margin-bottom:60px;
+}
+.game-card{
+  width:350px;
+  height:400px;
+  background:rgba(0,0,0,0.7);
+  border:4px solid #666;
+  border-radius:12px;
+  padding:30px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-between;
+  transition: all 0.3s ease;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+}
+.game-card:before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+  transform:translateX(-100%);
+  transition: transform 0.6s;
+}
+.game-card:hover:before,
+.game-card.selected:before{
+  transform:translateX(100%);
+}
+.game-card.selected{
+  border-color:#00F5FF;
+  border-width:6px;
+  box-shadow: 0 0 40px #00F5FF, inset 0 0 40px rgba(0,245,255,0.2);
+  transform:scale(1.05);
+}
+.game-card.selected .game-title{
+  color:#00F5FF;
+  text-shadow: 0 0 20px #00F5FF;
+}
+.game-icon{
+  font-size:120px;
+  margin-bottom:20px;
+  filter: drop-shadow(0 0 20px currentColor);
+}
+.game-title{
+  font-size:32px;
+  font-weight:bold;
+  color:#fff;
+  margin-bottom:15px;
+  text-align:center;
+  transition: all 0.3s ease;
+}
+.game-desc{
+  font-size:16px;
+  color:#aaa;
+  text-align:center;
+  line-height:1.6;
+  flex-grow:1;
+}
+.controls{
+  color:#9D4EDD;
+  text-align:center;
+  font-size:18px;
+  line-height:2;
+  background:rgba(0,0,0,0.5);
+  padding:20px 40px;
+  border-radius:8px;
+  border:2px solid #9D4EDD;
+  box-shadow: 0 0 20px rgba(157,78,221,0.3);
+}
+.scanline{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.15),
+    rgba(0,0,0,0.15) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  pointer-events:none;
+  z-index:1000;
+}
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<div id="container">
+  <div class="title">ARCADE GAMES</div>
+  <div class="subtitle">SELECT YOUR GAME</div>
+  
+  <div class="games">
+    <div class="game-card" id="game1" onclick="launchGame(0)">
+      <div class="game-icon">🚀</div>
+      <div class="game-title">ARC BUNDAS</div>
+      <div class="game-desc">
+        Classic space shooter! Destroy asteroids with bullets and lasers.
+        Move with joystick, fire with buttons!
+      </div>
+    </div>
+    
+    <div class="game-card" id="game2" onclick="launchGame(1)">
+      <div class="game-icon">🗡️</div>
+      <div class="game-title">VIBE KNIGHTS</div>
+      <div class="game-desc">
+        Cyberpunk endless runner! Jump over bars and duck under dragons.
+        Fast-paced action in a neon world!
+      </div>
+    </div>
+    
+    <div class="game-card" id="game3" onclick="launchGame(2)">
+      <div class="game-icon">🃏</div>
+      <div class="game-title">CYBER BLACKJACK</div>
+      <div class="game-desc">
+        Matrix-themed blackjack! Play with a 4-deck shoe.
+        Neon cards and falling code effects!
+      </div>
+    </div>
+    
+    <div class="game-card" id="game4" onclick="launchGame(3)">
+      <div class="game-icon">🏎️</div>
+      <div class="game-title">CYBER DRIVE</div>
+      <div class="game-desc">
+        Outrun-style sunset racing! Drive a Ferrari into the sunset.
+        Dodge obstacles and feel the vaporwave vibes!
+      </div>
+    </div>
+  </div>
+  
+  <div class="controls">
+    <strong>CONTROLS:</strong><br>
+    Joystick: Navigate Games<br>
+    START Button: Launch Game<br>
+    COIN Button: Toggle Games
+  </div>
+</div>
+
+<script>
+let selectedGame = 0;
+const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html'];
+const gameCards = document.querySelectorAll('.game-card');
+
+function updateSelection() {
+  gameCards.forEach((card, index) => {
+    if (index === selectedGame) {
+      card.classList.add('selected');
+    } else {
+      card.classList.remove('selected');
+    }
+  });
+}
+
+function launchGame(index) {
+  window.location.href = games[index];
+}
+
+// Gamepad handling
+let lastAxisX = 0;
+let axisPressed = false;
+let topButtonPressed = false;
+let startButtonPressed = false;
+
+function handleGamepad() {
+  const gp = navigator.getGamepads()[0];
+  if (!gp) return;
+
+  // Joystick navigation (left/right)
+  const axisX = gp.axes[0];
+  const dead = 0.3;
+  
+  if (Math.abs(axisX) > dead) {
+    if (!axisPressed) {
+      if (axisX < -dead) {
+        // Move left
+        selectedGame = Math.max(0, selectedGame - 1);
+        updateSelection();
+      } else if (axisX > dead) {
+        // Move right
+        selectedGame = Math.min(gameCards.length - 1, selectedGame + 1);
+        updateSelection();
+      }
+      axisPressed = true;
+    }
+  } else {
+    axisPressed = false;
+  }
+
+  // Top button (BTN 7) - Launch game
+  if (gp.buttons[7].pressed && !topButtonPressed) {
+    topButtonPressed = true;
+    launchGame(selectedGame);
+  } else if (!gp.buttons[7].pressed) {
+    topButtonPressed = false;
+  }
+
+  // K3/Start button (BTN 2) - Launch game
+  const startPressed = gp.buttons[2]?.pressed;
+  if (startPressed && !startButtonPressed) {
+    startButtonPressed = true;
+    launchGame(selectedGame);
+  } else if (!startPressed) {
+    startButtonPressed = false;
+  }
+
+  // K2/Coin button (BTN 3) - Toggle between games
+  const coinPressed = gp.buttons[3]?.pressed;
+  if (coinPressed && !axisPressed) {
+    if (!axisPressed) {
+      selectedGame = (selectedGame + 1) % gameCards.length;
+      updateSelection();
+      axisPressed = true;
+    }
+  }
+}
+
+// Keyboard controls for testing
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'ArrowLeft') {
+    selectedGame = Math.max(0, selectedGame - 1);
+    updateSelection();
+  } else if (e.code === 'ArrowRight') {
+    selectedGame = Math.min(gameCards.length - 1, selectedGame + 1);
+    updateSelection();
+  } else if (e.code === 'Enter' || e.code === 'Space') {
+    e.preventDefault();
+    launchGame(selectedGame);
+  }
+});
+
+// Main loop
+function mainLoop() {
+  handleGamepad();
+  requestAnimationFrame(mainLoop);
+}
+
+// Initialize
+updateSelection();
+mainLoop();
+
+// Announce gamepad connection
+window.addEventListener('gamepadconnected', (e) => {
+  console.log('Gamepad connected:', e.gamepad.id);
+});
+</script>
+</body>
+</html>

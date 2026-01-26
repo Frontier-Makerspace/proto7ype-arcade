@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Vibe Knights - Cyberpunk Runner</title>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background: linear-gradient(to bottom, #0A0A0F, #1A1A2E);
+  overflow:hidden;
+  font-family: 'Courier New', monospace;
+}
+#gameContainer{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:20px;
+}
+#scoreBoard{
+  display:flex;
+  gap:40px;
+  margin-bottom:20px;
+  font-size:24px;
+  font-weight:bold;
+}
+.score{color:#9D4EDD;}
+.highScore{color:#00F5FF;}
+canvas{
+  border:4px solid #9D4EDD;
+  border-radius:8px;
+  box-shadow: 0 0 20px #9D4EDD;
+  background:#0A0A0F;
+}
+#overlay{
+  position:absolute;
+  top:0;
+  left:0;
+  width:900px;
+  height:400px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.8);
+  border-radius:8px;
+  text-align:center;
+}
+.title{
+  font-size:48px;
+  color:#9D4EDD;
+  text-shadow: 0 0 20px #9D4EDD;
+  margin-bottom:20px;
+  text-transform:uppercase;
+}
+.subtitle{
+  font-size:20px;
+  color:#00F5FF;
+  margin-bottom:30px;
+}
+.instructions{
+  color:#fff;
+  font-size:16px;
+  line-height:1.8;
+  margin-bottom:30px;
+}
+.startBtn{
+  padding:15px 30px;
+  background:#FF006E;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:20px;
+  font-weight:bold;
+  cursor:pointer;
+  box-shadow: 0 0 20px #FF006E;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.7;}
+}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <div id="scoreBoard">
+    <div class="score">SCORE: <span id="score">0</span></div>
+    <div class="highScore">HI: <span id="highScore">0</span></div>
+  </div>
+  <div style="position:relative;">
+    <canvas id="canvas" width="900" height="400"></canvas>
+    <div id="overlay">
+      <div class="title">Vibe Knights</div>
+      <div class="subtitle">Cyberpunk Runner</div>
+      <div class="instructions">
+        Down Button: Jump over bars<br>
+        Top Button: Duck under dragons<br>
+        <br>
+        Press START to begin<br>
+        Press COIN to return to menu
+      </div>
+      <div class="startBtn" onclick="startGame()">PRESS START</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+// Constants
+const GAME_WIDTH = 900;
+const GAME_HEIGHT = 400;
+const GROUND_HEIGHT = 50;
+const GROUND_Y = GAME_HEIGHT - GROUND_HEIGHT;
+
+const KNIGHT_WIDTH = 30;
+const KNIGHT_HEIGHT = 40;
+const KNIGHT_X = 100;
+const JUMP_VELOCITY = -12;
+const GRAVITY = 0.6;
+const DUCK_HEIGHT = 25;
+
+const BAR_WIDTH = 20;
+const BAR_HEIGHT = 50;
+const BAR_MIN_GAP = 80;
+const BAR_MAX_GAP = 150;
+
+const DRAGON_WIDTH = 50;
+const DRAGON_HEIGHT = 30;
+const DRAGON_Y = GROUND_Y - 80;
+const DRAGON_MIN_GAP = 100;
+const DRAGON_MAX_GAP = 180;
+
+const INITIAL_SPEED = 6;
+const SPEED_INCREMENT = 0.0005;
+const MAX_SPEED = 12;
+
+const COLORS = {
+  purple: '#9D4EDD',
+  purpleLight: '#C77DFF',
+  pink: '#FF006E',
+  cyan: '#00F5FF',
+  dark: '#0A0A0F',
+  darker: '#1A1A2E',
+  grid: '#4A148C',
+};
+
+// Game state
+let gameState = 'start'; // 'start', 'playing', 'gameOver'
+let score = 0;
+let highScore = localStorage.getItem('vibeKnightsHighScore') || 0;
+let speed = INITIAL_SPEED;
+let frameCount = 0;
+let lastBarSpawn = 0;
+let lastDragonSpawn = 0;
+
+document.getElementById('highScore').textContent = highScore;
+
+// Knight class
+class Knight {
+  constructor() {
+    this.x = KNIGHT_X;
+    this.y = GROUND_Y - KNIGHT_HEIGHT;
+    this.width = KNIGHT_WIDTH;
+    this.height = KNIGHT_HEIGHT;
+    this.velocityY = 0;
+    this.isJumping = false;
+    this.isDucking = false;
+  }
+
+  jump() {
+    if (!this.isJumping && !this.isDucking) {
+      this.velocityY = JUMP_VELOCITY;
+      this.isJumping = true;
+    }
+  }
+
+  duck() {
+    if (!this.isJumping) {
+      this.isDucking = true;
+      this.height = DUCK_HEIGHT;
+      this.y = GROUND_Y - DUCK_HEIGHT;
+    }
+  }
+
+  stopDuck() {
+    this.isDucking = false;
+    this.height = KNIGHT_HEIGHT;
+    this.y = GROUND_Y - KNIGHT_HEIGHT;
+  }
+
+  update() {
+    if (this.isJumping) {
+      this.velocityY += GRAVITY;
+      this.y += this.velocityY;
+
+      if (this.y >= GROUND_Y - this.height) {
+        this.y = GROUND_Y - this.height;
+        this.velocityY = 0;
+        this.isJumping = false;
+      }
+    }
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = COLORS.purple;
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+
+    ctx.strokeStyle = COLORS.purpleLight;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = COLORS.purple;
+    ctx.strokeRect(this.x, this.y, this.width, this.height);
+    ctx.shadowBlur = 0;
+
+    const helmetHeight = this.height * 0.3;
+    ctx.fillStyle = COLORS.cyan;
+    ctx.fillRect(this.x + 5, this.y, this.width - 10, helmetHeight);
+
+    ctx.fillStyle = COLORS.pink;
+    ctx.fillRect(this.x + 8, this.y + 5, 5, 3);
+    ctx.fillRect(this.x + this.width - 13, this.y + 5, 5, 3);
+  }
+
+  getHitbox() {
+    return {
+      x: this.x + 2,
+      y: this.y + 2,
+      width: this.width - 4,
+      height: this.height - 4,
+    };
+  }
+}
+
+// Bar class
+class Bar {
+  constructor(x) {
+    this.x = x;
+    this.y = GROUND_Y - BAR_HEIGHT;
+    this.width = BAR_WIDTH;
+    this.height = BAR_HEIGHT;
+    this.passed = false;
+  }
+
+  update(speed) {
+    this.x -= speed;
+  }
+
+  draw(ctx) {
+    const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+    gradient.addColorStop(0, COLORS.purpleLight);
+    gradient.addColorStop(0.5, COLORS.purple);
+    gradient.addColorStop(1, COLORS.purpleLight);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = COLORS.purpleLight;
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = COLORS.cyan;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.fillRect(this.x + this.width / 2 - 2, this.y + 10, 4, this.height - 20);
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = COLORS.cyan;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(this.x, this.y, this.width, this.height);
+  }
+
+  isOffScreen() {
+    return this.x + this.width < 0;
+  }
+
+  getHitbox() {
+    return { x: this.x, y: this.y, width: this.width, height: this.height };
+  }
+}
+
+// Dragon class
+class Dragon {
+  constructor(x) {
+    this.x = x;
+    this.y = DRAGON_Y;
+    this.width = DRAGON_WIDTH;
+    this.height = DRAGON_HEIGHT;
+    this.passed = false;
+    this.wingOffset = 0;
+  }
+
+  update(speed) {
+    this.x -= speed;
+    this.wingOffset = (this.wingOffset + 0.3) % (Math.PI * 2);
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = COLORS.pink;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = COLORS.pink;
+    ctx.fillRect(this.x + 15, this.y + 8, 20, 14);
+    ctx.fillRect(this.x + 35, this.y + 10, 12, 10);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = COLORS.cyan;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.fillRect(this.x + 40, this.y + 12, 4, 4);
+    ctx.shadowBlur = 0;
+
+    const wingFlap = Math.sin(this.wingOffset) * 5;
+
+    ctx.fillStyle = COLORS.purpleLight;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = COLORS.purple;
+    ctx.beginPath();
+    ctx.moveTo(this.x + 15, this.y + 10);
+    ctx.lineTo(this.x, this.y + wingFlap);
+    ctx.lineTo(this.x + 10, this.y + 15);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(this.x + 35, this.y + 10);
+    ctx.lineTo(this.x + 50, this.y + wingFlap);
+    ctx.lineTo(this.x + 40, this.y + 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = COLORS.cyan;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.strokeRect(this.x + 15, this.y + 8, 20, 14);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = COLORS.pink;
+    ctx.fillRect(this.x + 8, this.y + 15, 10, 4);
+  }
+
+  isOffScreen() {
+    return this.x + this.width < 0;
+  }
+
+  getHitbox() {
+    return {
+      x: this.x + 10,
+      y: this.y + 8,
+      width: this.width - 15,
+      height: this.height - 8,
+    };
+  }
+}
+
+let knight = new Knight();
+let bars = [];
+let dragons = [];
+
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+  gradient.addColorStop(0, COLORS.dark);
+  gradient.addColorStop(1, COLORS.darker);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  ctx.fillStyle = COLORS.purpleLight;
+  for (let i = 0; i < 50; i++) {
+    const x = (i * 173) % GAME_WIDTH;
+    const y = (i * 79) % (GROUND_Y - 50);
+    const size = (i % 3) + 1;
+    ctx.fillRect(x, y, size, size);
+  }
+
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.3;
+
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y + i * 10);
+    ctx.lineTo(GAME_WIDTH, GROUND_Y + i * 10);
+    ctx.stroke();
+  }
+
+  const offset = (frameCount * 2) % 40;
+  for (let i = -1; i < GAME_WIDTH / 40 + 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * 40 - offset, GROUND_Y);
+    ctx.lineTo(i * 40 - offset, GAME_HEIGHT);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = COLORS.purple;
+  ctx.lineWidth = 3;
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = COLORS.purple;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y);
+  ctx.lineTo(GAME_WIDTH, GROUND_Y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function checkCollision(rect1, rect2) {
+  return (
+    rect1.x < rect2.x + rect2.width &&
+    rect1.x + rect1.width > rect2.x &&
+    rect1.y < rect2.y + rect2.height &&
+    rect1.y + rect1.height > rect2.y
+  );
+}
+
+function startGame() {
+  knight = new Knight();
+  bars = [];
+  dragons = [];
+  speed = INITIAL_SPEED;
+  score = 0;
+  frameCount = 0;
+  lastBarSpawn = 0;
+  lastDragonSpawn = 0;
+  gameState = 'playing';
+  overlay.style.display = 'none';
+  document.getElementById('score').textContent = '0';
+  gameLoop();
+}
+
+function gameOver() {
+  gameState = 'gameOver';
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('vibeKnightsHighScore', highScore);
+    document.getElementById('highScore').textContent = highScore;
+  }
+  overlay.innerHTML = `
+    <div class="title" style="font-size:40px;color:#FF006E;">Game Over</div>
+    <div class="subtitle" style="font-size:28px;margin-bottom:10px;">Score: ${score}</div>
+    <div class="subtitle" style="font-size:24px;margin-bottom:20px;">High Score: ${highScore}</div>
+    <div class="startBtn" onclick="startGame()" style="margin-bottom:15px;">PRESS START TO RESTART</div>
+    <div style="color:#00F5FF;font-size:16px;">Press COIN to return to menu</div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+function gameLoop() {
+  if (gameState !== 'playing') return;
+
+  frameCount++;
+  ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  drawBackground();
+
+  knight.update();
+  knight.draw(ctx);
+
+  if (frameCount - lastBarSpawn > BAR_MIN_GAP + Math.random() * (BAR_MAX_GAP - BAR_MIN_GAP)) {
+    bars.push(new Bar(GAME_WIDTH));
+    lastBarSpawn = frameCount;
+  }
+
+  if (frameCount - lastDragonSpawn > DRAGON_MIN_GAP + Math.random() * (DRAGON_MAX_GAP - DRAGON_MIN_GAP)) {
+    dragons.push(new Dragon(GAME_WIDTH));
+    lastDragonSpawn = frameCount;
+  }
+
+  bars = bars.filter((bar) => {
+    bar.update(speed);
+    bar.draw(ctx);
+
+    if (checkCollision(knight.getHitbox(), bar.getHitbox())) {
+      gameOver();
+      return true;
+    }
+
+    if (!bar.passed && bar.x + bar.width < knight.x) {
+      bar.passed = true;
+      score += 10;
+      document.getElementById('score').textContent = score;
+    }
+
+    return !bar.isOffScreen();
+  });
+
+  dragons = dragons.filter((dragon) => {
+    dragon.update(speed);
+    dragon.draw(ctx);
+
+    if (checkCollision(knight.getHitbox(), dragon.getHitbox())) {
+      gameOver();
+      return true;
+    }
+
+    if (!dragon.passed && dragon.x + dragon.width < knight.x) {
+      dragon.passed = true;
+      score += 15;
+      document.getElementById('score').textContent = score;
+    }
+
+    return !dragon.isOffScreen();
+  });
+
+  if (speed < MAX_SPEED) {
+    speed += SPEED_INCREMENT;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// Gamepad controls
+let topPressed = false;
+let downPressed = false;
+let stPressed = false;
+
+function handleGamepad() {
+  const gp = navigator.getGamepads()[0];
+  if (!gp) return;
+
+  // Top button (BTN 4) - Duck
+  if (gameState === 'playing') {
+    if (gp.buttons[4].pressed && !topPressed) {
+      knight.duck();
+      topPressed = true;
+    } else if (!gp.buttons[4].pressed && topPressed) {
+      knight.stopDuck();
+      topPressed = false;
+    }
+  }
+
+  // Down button (BTN 7) - Jump
+  if (gp.buttons[7].pressed && !downPressed) {
+    downPressed = true;
+    if (gameState === 'start') {
+      startGame();
+    } else if (gameState === 'playing') {
+      knight.jump();
+    } else if (gameState === 'gameOver') {
+      startGame();
+    }
+  } else if (!gp.buttons[7].pressed) {
+    downPressed = false;
+  }
+
+  // K3/Start button (BTN 2) - Start/Restart
+  const k3Button = gp.buttons[2]?.pressed;
+  if (k3Button && !stPressed) {
+    stPressed = true;
+    if (gameState !== 'playing') {
+      startGame();
+    }
+  } else if (!k3Button) {
+    stPressed = false;
+  }
+
+  // K2/Coin button (BTN 3) - Return to menu (not during gameplay)
+  if (gp.buttons[3]?.pressed && (gameState === 'start' || gameState === 'gameOver')) {
+    window.location.href = 'index.html';
+    return;
+  }
+}
+
+// Keyboard controls for testing
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') {
+    e.preventDefault();
+    if (gameState === 'start') {
+      startGame();
+    } else if (gameState === 'playing') {
+      knight.jump();
+    } else if (gameState === 'gameOver') {
+      startGame();
+    }
+  } else if (e.code === 'ArrowDown' && gameState === 'playing') {
+    knight.duck();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowDown' && gameState === 'playing') {
+    knight.stopDuck();
+  }
+});
+
+// Main loop for gamepad polling
+function mainLoop() {
+  handleGamepad();
+  requestAnimationFrame(mainLoop);
+}
+mainLoop();
+</script>
+</body>
+</html>
