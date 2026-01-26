@@ -40,12 +40,47 @@ html,body{
   margin-bottom:60px;
   text-align:center;
 }
+.carousel-container{
+  position:relative;
+  width:100%;
+  max-width:1400px;
+  margin-bottom:60px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.carousel-arrow{
+  font-size:64px;
+  color:#00F5FF;
+  text-shadow: 0 0 20px #00F5FF;
+  cursor:pointer;
+  user-select:none;
+  transition: all 0.3s ease;
+  padding:0 30px;
+}
+.carousel-arrow:hover{
+  color:#fff;
+  text-shadow: 0 0 30px #00F5FF;
+  transform:scale(1.2);
+}
+.carousel-arrow.hidden{
+  opacity:0;
+  pointer-events:none;
+}
+.games-viewport{
+  overflow-x:hidden;
+  overflow-y:visible;
+  width:1300px;
+  position:relative;
+  padding:60px 60px;
+}
 .games{
   display:flex;
   gap:60px;
-  margin-bottom:60px;
+  transition: transform 0.5s ease;
 }
 .game-card{
+  min-width:350px;
   width:350px;
   height:400px;
   background:rgba(0,0,0,0.7);
@@ -143,42 +178,59 @@ html,body{
   <div class="title">ARCADE GAMES</div>
   <div class="subtitle">SELECT YOUR GAME</div>
   
-  <div class="games">
-    <div class="game-card" id="game1" onclick="launchGame(0)">
-      <div class="game-icon">🚀</div>
-      <div class="game-title">ARC BUNDAS</div>
-      <div class="game-desc">
-        Classic space shooter! Destroy asteroids with bullets and lasers.
-        Move with joystick, fire with buttons!
+  <div class="carousel-container">
+    <div class="carousel-arrow" id="leftArrow">◄</div>
+    
+    <div class="games-viewport">
+      <div class="games" id="gamesContainer">
+        <div class="game-card" id="game1" onclick="launchGame(0)">
+          <div class="game-icon">🚀</div>
+          <div class="game-title">ARC BUNDAS</div>
+          <div class="game-desc">
+            Classic space shooter! Destroy asteroids with bullets and lasers.
+            Move with joystick, fire with buttons!
+          </div>
+        </div>
+        
+        <div class="game-card" id="game2" onclick="launchGame(1)">
+          <div class="game-icon">🗡️</div>
+          <div class="game-title">VIBE KNIGHTS</div>
+          <div class="game-desc">
+            Cyberpunk endless runner! Jump over bars and duck under dragons.
+            Fast-paced action in a neon world!
+          </div>
+        </div>
+        
+        <div class="game-card" id="game3" onclick="launchGame(2)">
+          <div class="game-icon">🃏</div>
+          <div class="game-title">CYBER BLACKJACK</div>
+          <div class="game-desc">
+            Matrix-themed blackjack! Play with a 4-deck shoe.
+            Neon cards and falling code effects!
+          </div>
+        </div>
+        
+        <div class="game-card" id="game4" onclick="launchGame(3)">
+          <div class="game-icon">🏎️</div>
+          <div class="game-title">CYBER DRIVE</div>
+          <div class="game-desc">
+            Outrun-style sunset racing! Drive a Ferrari into the sunset.
+            Dodge obstacles and feel the vaporwave vibes!
+          </div>
+        </div>
+        
+        <div class="game-card" id="game5" onclick="launchGame(4)">
+          <div class="game-icon">🤖</div>
+          <div class="game-title">UFB</div>
+          <div class="game-desc">
+            Ultimate Fighting Bots! Control a Unitree humanoid robot.
+            Epic robot combat with punches, kicks, and blocks!
+          </div>
+        </div>
       </div>
     </div>
     
-    <div class="game-card" id="game2" onclick="launchGame(1)">
-      <div class="game-icon">🗡️</div>
-      <div class="game-title">VIBE KNIGHTS</div>
-      <div class="game-desc">
-        Cyberpunk endless runner! Jump over bars and duck under dragons.
-        Fast-paced action in a neon world!
-      </div>
-    </div>
-    
-    <div class="game-card" id="game3" onclick="launchGame(2)">
-      <div class="game-icon">🃏</div>
-      <div class="game-title">CYBER BLACKJACK</div>
-      <div class="game-desc">
-        Matrix-themed blackjack! Play with a 4-deck shoe.
-        Neon cards and falling code effects!
-      </div>
-    </div>
-    
-    <div class="game-card" id="game4" onclick="launchGame(3)">
-      <div class="game-icon">🏎️</div>
-      <div class="game-title">CYBER DRIVE</div>
-      <div class="game-desc">
-        Outrun-style sunset racing! Drive a Ferrari into the sunset.
-        Dodge obstacles and feel the vaporwave vibes!
-      </div>
-    </div>
+    <div class="carousel-arrow" id="rightArrow">►</div>
   </div>
   
   <div class="controls">
@@ -191,10 +243,14 @@ html,body{
 
 <script>
 let selectedGame = 0;
-const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html'];
+const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html'];
 const gameCards = document.querySelectorAll('.game-card');
+const gamesContainer = document.getElementById('gamesContainer');
+const leftArrow = document.getElementById('leftArrow');
+const rightArrow = document.getElementById('rightArrow');
 
-function updateSelection() {
+function updateCarousel() {
+  // Update selection
   gameCards.forEach((card, index) => {
     if (index === selectedGame) {
       card.classList.add('selected');
@@ -202,14 +258,58 @@ function updateSelection() {
       card.classList.remove('selected');
     }
   });
+  
+  // Calculate offset to show 3 games centered on selected game
+  // Each card is 350px + 60px gap = 410px
+  const cardWidth = 410;
+  let offset = 0;
+  
+  // Keep selected game in center when possible
+  if (selectedGame === 0) {
+    offset = 0;
+  } else if (selectedGame >= gameCards.length - 2) {
+    // Show last 3 games when near the end
+    offset = -(gameCards.length - 3) * cardWidth;
+  } else {
+    offset = -(selectedGame - 1) * cardWidth;
+  }
+  
+  gamesContainer.style.transform = `translateX(${offset}px)`;
+  
+  // Update arrow visibility
+  if (selectedGame === 0) {
+    leftArrow.classList.add('hidden');
+  } else {
+    leftArrow.classList.remove('hidden');
+  }
+  
+  if (selectedGame === gameCards.length - 1) {
+    rightArrow.classList.add('hidden');
+  } else {
+    rightArrow.classList.remove('hidden');
+  }
 }
 
 function launchGame(index) {
   window.location.href = games[index];
 }
 
+// Arrow click handlers
+leftArrow.addEventListener('click', () => {
+  if (selectedGame > 0) {
+    selectedGame--;
+    updateCarousel();
+  }
+});
+
+rightArrow.addEventListener('click', () => {
+  if (selectedGame < gameCards.length - 1) {
+    selectedGame++;
+    updateCarousel();
+  }
+});
+
 // Gamepad handling
-let lastAxisX = 0;
 let axisPressed = false;
 let topButtonPressed = false;
 let startButtonPressed = false;
@@ -226,12 +326,16 @@ function handleGamepad() {
     if (!axisPressed) {
       if (axisX < -dead) {
         // Move left
-        selectedGame = Math.max(0, selectedGame - 1);
-        updateSelection();
+        if (selectedGame > 0) {
+          selectedGame--;
+          updateCarousel();
+        }
       } else if (axisX > dead) {
         // Move right
-        selectedGame = Math.min(gameCards.length - 1, selectedGame + 1);
-        updateSelection();
+        if (selectedGame < gameCards.length - 1) {
+          selectedGame++;
+          updateCarousel();
+        }
       }
       axisPressed = true;
     }
@@ -240,10 +344,10 @@ function handleGamepad() {
   }
 
   // Top button (BTN 7) - Launch game
-  if (gp.buttons[7].pressed && !topButtonPressed) {
+  if (gp.buttons[7]?.pressed && !topButtonPressed) {
     topButtonPressed = true;
     launchGame(selectedGame);
-  } else if (!gp.buttons[7].pressed) {
+  } else if (!gp.buttons[7]?.pressed) {
     topButtonPressed = false;
   }
 
@@ -259,22 +363,24 @@ function handleGamepad() {
   // K2/Coin button (BTN 3) - Toggle between games
   const coinPressed = gp.buttons[3]?.pressed;
   if (coinPressed && !axisPressed) {
-    if (!axisPressed) {
-      selectedGame = (selectedGame + 1) % gameCards.length;
-      updateSelection();
-      axisPressed = true;
-    }
+    selectedGame = (selectedGame + 1) % gameCards.length;
+    updateCarousel();
+    axisPressed = true;
   }
 }
 
 // Keyboard controls for testing
 document.addEventListener('keydown', (e) => {
   if (e.code === 'ArrowLeft') {
-    selectedGame = Math.max(0, selectedGame - 1);
-    updateSelection();
+    if (selectedGame > 0) {
+      selectedGame--;
+      updateCarousel();
+    }
   } else if (e.code === 'ArrowRight') {
-    selectedGame = Math.min(gameCards.length - 1, selectedGame + 1);
-    updateSelection();
+    if (selectedGame < gameCards.length - 1) {
+      selectedGame++;
+      updateCarousel();
+    }
   } else if (e.code === 'Enter' || e.code === 'Space') {
     e.preventDefault();
     launchGame(selectedGame);
@@ -288,7 +394,7 @@ function mainLoop() {
 }
 
 // Initialize
-updateSelection();
+updateCarousel();
 mainLoop();
 
 // Announce gamepad connection

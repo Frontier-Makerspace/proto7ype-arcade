@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>UFB - Ultimate Fighting Bots</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:#000;
+  overflow:hidden;
+  font-family:'Courier New',monospace;
+}
+canvas{display:block;}
+#ui{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  padding:20px;
+  z-index:10;
+  pointer-events:none;
+}
+.health-bar{
+  height:40px;
+  background:#222;
+  border:3px solid #00F5FF;
+  position:relative;
+  box-shadow:0 0 20px #00F5FF;
+}
+.health-fill{
+  height:100%;
+  background:linear-gradient(90deg,#0f0,#FFD60A,#FF006E);
+  transition:width 0.3s;
+  box-shadow:inset 0 0 20px rgba(255,255,255,0.5);
+}
+.player-bars{
+  position:absolute;
+  top:20px;
+  width:45%;
+}
+#p1-bars{left:20px;}
+#p2-bars{right:20px;}
+.name{
+  color:#00F5FF;
+  font-size:24px;
+  font-weight:bold;
+  text-shadow:0 0 10px #00F5FF;
+  margin-bottom:10px;
+}
+.round{
+  position:absolute;
+  top:20px;
+  left:50%;
+  transform:translateX(-50%);
+  text-align:center;
+}
+.round-text{
+  color:#FFD60A;
+  font-size:32px;
+  font-weight:bold;
+  text-shadow:0 0 20px #FFD60A;
+}
+#message{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  color:#fff;
+  font-size:64px;
+  font-weight:bold;
+  text-shadow:0 0 30px #FF006E;
+  z-index:20;
+  display:none;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:translate(-50%,-50%) scale(1);}
+  50%{transform:translate(-50%,-50%) scale(1.1);}
+}
+.title-screen{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:linear-gradient(135deg,#000,#1a0033,#000);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  z-index:30;
+}
+.title{
+  font-size:96px;
+  color:#00F5FF;
+  text-shadow:0 0 40px #00F5FF;
+  margin-bottom:20px;
+  animation:glow 2s infinite;
+}
+@keyframes glow{
+  0%,100%{text-shadow:0 0 20px #00F5FF;}
+  50%{text-shadow:0 0 60px #00F5FF, 0 0 80px #00F5FF;}
+}
+.subtitle{
+  font-size:28px;
+  color:#FFD60A;
+  text-shadow:0 0 15px #FFD60A;
+  margin-bottom:60px;
+}
+.start-text{
+  font-size:32px;
+  color:#FF006E;
+  text-shadow:0 0 20px #FF006E;
+  animation:blink 1.5s infinite;
+}
+@keyframes blink{
+  0%,100%{opacity:1;}
+  50%{opacity:0.3;}
+}
+.instructions{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  color:#00F5FF;
+  font-size:14px;
+  text-align:center;
+  z-index:10;
+}
+</style>
+</head>
+<body>
+<div class="title-screen" id="titleScreen">
+  <div class="title">UFB</div>
+  <div class="subtitle">ULTIMATE FIGHTING BOTS</div>
+  <div style="color:#888;font-size:20px;margin-bottom:40px;">The Future of Robot Combat</div>
+  <div class="start-text">PRESS START</div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div class="player-bars" id="p1-bars">
+    <div class="name">PLAYER 1</div>
+    <div class="health-bar">
+      <div class="health-fill" id="p1-health" style="width:100%"></div>
+    </div>
+  </div>
+  
+  <div class="round">
+    <div class="round-text" id="roundText">ROUND 1</div>
+  </div>
+  
+  <div class="player-bars" id="p2-bars">
+    <div class="name">OPPONENT</div>
+    <div class="health-bar">
+      <div class="health-fill" id="p2-health" style="width:100%"></div>
+    </div>
+  </div>
+</div>
+
+<div id="message"></div>
+
+<div class="instructions">
+  TOP: Punch | DOWN: Kick | LEFT: Block | JOYSTICK: Move | START: Begin | COIN: Menu
+</div>
+
+<script>
+const c=document.getElementById('c');
+const ctx=c.getContext('2d');
+c.width=innerWidth;
+c.height=innerHeight;
+
+let gameState='title';
+let round=1;
+let particles=[];
+
+const player1={
+  x:c.width*0.25,
+  y:c.height*0.7,
+  vx:0,
+  health:100,
+  maxHealth:100,
+  facing:1,
+  action:'idle',
+  actionTimer:0,
+  actionFrame:0,
+  blocking:false,
+  stunned:false,
+  stunnedTimer:0
+};
+
+const player2={
+  x:c.width*0.75,
+  y:c.height*0.7,
+  vx:0,
+  health:100,
+  maxHealth:100,
+  facing:-1,
+  action:'idle',
+  actionTimer:0,
+  actionFrame:0,
+  blocking:false,
+  stunned:false,
+  stunnedTimer:0,
+  aiTimer:0
+};
+
+const ROBOT_WIDTH=80;
+const ROBOT_HEIGHT=120;
+const GROUND_Y=c.height*0.7;
+
+function drawArena(){
+  // Background
+  const g=ctx.createLinearGradient(0,0,0,c.height*0.6);
+  g.addColorStop(0,'#0a0015');
+  g.addColorStop(1,'#1a0033');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,c.width,c.height*0.6);
+  
+  // Floor
+  const fg=ctx.createLinearGradient(0,GROUND_Y,0,c.height);
+  fg.addColorStop(0,'#1a0033');
+  fg.addColorStop(1,'#0a0015');
+  ctx.fillStyle=fg;
+  ctx.fillRect(0,GROUND_Y,c.width,c.height-GROUND_Y);
+  
+  // Grid
+  ctx.strokeStyle='rgba(0,245,255,0.2)';
+  ctx.lineWidth=1;
+  for(let i=0;i<20;i++){
+    ctx.beginPath();
+    ctx.moveTo(0,GROUND_Y+i*30);
+    ctx.lineTo(c.width,GROUND_Y+i*30);
+    ctx.stroke();
+  }
+  for(let i=0;i<40;i++){
+    ctx.beginPath();
+    ctx.moveTo(i*50,GROUND_Y);
+    ctx.lineTo(i*50,c.height);
+    ctx.stroke();
+  }
+  
+  // Center line
+  ctx.strokeStyle='#FFD60A';
+  ctx.lineWidth=3;
+  ctx.shadowBlur=10;
+  ctx.shadowColor='#FFD60A';
+  ctx.beginPath();
+  ctx.moveTo(c.width/2,GROUND_Y);
+  ctx.lineTo(c.width/2,c.height);
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  
+  // UFB Branding
+  ctx.fillStyle='rgba(0,245,255,0.3)';
+  ctx.font='bold 48px monospace';
+  ctx.textAlign='center';
+  ctx.fillText('UFB',c.width/2,GROUND_Y+60);
+  ctx.fillStyle='rgba(255,214,10,0.2)';
+  ctx.font='16px monospace';
+  ctx.fillText('ULTIMATE FIGHTING BOTS',c.width/2,GROUND_Y+90);
+}
+
+function drawRobot(robot,color){
+  ctx.save();
+  ctx.translate(robot.x,robot.y);
+  if(robot.facing<0) ctx.scale(-1,1);
+  
+  // Stun effect
+  if(robot.stunned){
+    ctx.globalAlpha=0.3+Math.random()*0.4;
+    ctx.shadowBlur=30;
+    ctx.shadowColor='#FF006E';
+  }
+  
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.4)';
+  ctx.fillRect(-ROBOT_WIDTH/2,ROBOT_HEIGHT,ROBOT_WIDTH,10);
+  
+  // Animation progress
+  const progress=robot.actionFrame/30;
+  const punchExt=robot.action==='punch'?Math.sin(progress*Math.PI)*30:0;
+  const kickExt=robot.action==='kick'?Math.sin(progress*Math.PI)*35:0;
+  const bodyLean=robot.action==='punch'?progress*5:robot.action==='kick'?-progress*8:0;
+  
+  ctx.shadowBlur=20;
+  ctx.shadowColor=color;
+  
+  // Legs
+  ctx.fillStyle=color;
+  const leftLegX=-25;
+  const rightLegX=10+kickExt;
+  ctx.fillRect(leftLegX,-10,15,50);
+  ctx.fillRect(rightLegX,-10,15,50);
+  
+  // Knee joints
+  ctx.fillStyle='#333';
+  ctx.fillRect(leftLegX-2,10,19,8);
+  ctx.fillRect(rightLegX-2,10,19,8);
+  
+  // Body
+  ctx.save();
+  ctx.translate(bodyLean,0);
+  
+  ctx.fillStyle=color;
+  ctx.fillRect(-30,-70,60,60);
+  
+  // Chest
+  ctx.fillStyle='#111';
+  ctx.fillRect(-20,-65,40,45);
+  
+  // LEDs
+  ctx.fillStyle='#00F5FF';
+  for(let i=0;i<3;i++){
+    ctx.fillRect(-15,-60+i*15,8,8);
+    ctx.fillRect(7,-60+i*15,8,8);
+  }
+  
+  // Arms
+  const leftArmX=-45+punchExt;
+  const rightArmX=30;
+  ctx.fillStyle=color;
+  ctx.fillRect(leftArmX,-60,15,40);
+  ctx.fillRect(rightArmX,-60,15,40);
+  
+  // Hands
+  ctx.fillStyle='#333';
+  ctx.fillRect(leftArmX-3,-25,21,12);
+  ctx.fillRect(rightArmX-3,-25,21,12);
+  
+  // Punch glow
+  if(robot.action==='punch' && progress>0.5){
+    ctx.fillStyle='rgba(255,214,10,0.6)';
+    ctx.shadowBlur=20;
+    ctx.shadowColor='#FFD60A';
+    ctx.beginPath();
+    ctx.arc(leftArmX,-19,12,0,Math.PI*2);
+    ctx.fill();
+  }
+  
+  // Head
+  ctx.fillStyle=color;
+  ctx.fillRect(-20,-100,40,30);
+  
+  // Visor
+  ctx.fillStyle='rgba(0,245,255,0.8)';
+  ctx.fillRect(-15,-95,30,12);
+  
+  // Head detail
+  ctx.strokeStyle='#333';
+  ctx.lineWidth=2;
+  ctx.strokeRect(-20,-100,40,30);
+  
+  // Antenna
+  ctx.fillStyle='#FFD60A';
+  ctx.fillRect(-5,-110,3,10);
+  ctx.fillRect(2,-110,3,10);
+  
+  ctx.restore(); // End body transform
+  
+  // Block shield
+  if(robot.blocking){
+    const pulseSize=10+Math.sin(Date.now()*0.01)*5;
+    ctx.fillStyle='rgba(0,245,255,0.4)';
+    ctx.strokeStyle='#00F5FF';
+    ctx.lineWidth=3;
+    ctx.shadowBlur=20;
+    ctx.shadowColor='#00F5FF';
+    ctx.beginPath();
+    ctx.ellipse(0,-40,50+pulseSize,70+pulseSize,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  
+  ctx.shadowBlur=0;
+  ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+function createImpact(x,y){
+  for(let i=0;i<15;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=2+Math.random()*4;
+    particles.push({
+      x:x,
+      y:y,
+      vx:Math.cos(angle)*speed,
+      vy:Math.sin(angle)*speed,
+      life:30,
+      maxLife:30,
+      color:['#FFD60A','#FF006E','#00F5FF'][Math.floor(Math.random()*3)]
+    });
+  }
+}
+
+function drawParticles(){
+  particles.forEach((p,i)=>{
+    p.x+=p.vx;
+    p.y+=p.vy;
+    p.life--;
+    
+    if(p.life<=0){
+      particles.splice(i,1);
+      return;
+    }
+    
+    ctx.fillStyle=p.color;
+    ctx.globalAlpha=p.life/p.maxLife;
+    ctx.fillRect(p.x-4,p.y-4,8,8);
+    ctx.globalAlpha=1;
+  });
+}
+
+function checkHit(attacker,defender){
+  const distance=Math.abs(attacker.x-defender.x);
+  const range=150;
+  
+  if(distance<range && !defender.blocking && !defender.stunned){
+    const damage=attacker.action==='kick'?15:10;
+    defender.health=Math.max(0,defender.health-damage);
+    defender.stunned=true;
+    defender.stunnedTimer=15;
+    
+    // Knockback
+    defender.vx=(defender.x-attacker.x>0?1:-1)*8;
+    
+    // Impact effect
+    createImpact(defender.x,defender.y-50);
+    
+    return true;
+  }
+  return false;
+}
+
+function updatePlayer(){
+  if(player1.stunned){
+    player1.stunnedTimer--;
+    if(player1.stunnedTimer<=0){
+      player1.stunned=false;
+      player1.action='idle';
+    }
+  }
+  
+  if(player1.actionTimer>0){
+    player1.actionTimer--;
+    player1.actionFrame++;
+    
+    // Hit detection at peak of animation
+    if(player1.actionFrame===15 && (player1.action==='punch'||player1.action==='kick')){
+      checkHit(player1,player2);
+    }
+  }else if(!player1.stunned){
+    player1.action='idle';
+    player1.actionFrame=0;
+  }
+  
+  // Movement
+  player1.x+=player1.vx;
+  player1.vx*=0.85;
+  player1.x=Math.max(50,Math.min(c.width-50,player1.x));
+  
+  document.getElementById('p1-health').style.width=(player1.health/player1.maxHealth*100)+'%';
+}
+
+function updateAI(){
+  if(player2.stunned){
+    player2.stunnedTimer--;
+    if(player2.stunnedTimer<=0){
+      player2.stunned=false;
+      player2.action='idle';
+    }
+    return;
+  }
+  
+  if(player2.actionTimer>0){
+    player2.actionTimer--;
+    player2.actionFrame++;
+    
+    if(player2.actionFrame===15 && (player2.action==='punch'||player2.action==='kick')){
+      checkHit(player2,player1);
+    }
+  }else{
+    player2.action='idle';
+    player2.actionFrame=0;
+  }
+  
+  // AI logic
+  player2.aiTimer++;
+  const distance=Math.abs(player2.x-player1.x);
+  
+  if(player2.aiTimer>60){
+    player2.aiTimer=0;
+    
+    if(distance>200){
+      player2.vx=player1.x>player2.x?-2.5:2.5;
+    }else if(distance<170){
+      const r=Math.random();
+      if(r<0.35){
+        player2.action='punch';
+        player2.actionTimer=30;
+        player2.actionFrame=0;
+      }else if(r<0.65){
+        player2.action='kick';
+        player2.actionTimer=30;
+        player2.actionFrame=0;
+      }else{
+        player2.blocking=true;
+        setTimeout(()=>player2.blocking=false,700);
+      }
+    }
+  }
+  
+  player2.x+=player2.vx;
+  player2.vx*=0.85;
+  player2.x=Math.max(50,Math.min(c.width-50,player2.x));
+  player2.facing=player1.x>player2.x?1:-1;
+  
+  document.getElementById('p2-health').style.width=(player2.health/player2.maxHealth*100)+'%';
+}
+
+function checkRoundEnd(){
+  if(player1.health<=0){
+    showMessage('OPPONENT WINS!');
+    setTimeout(resetRound,3000);
+    return true;
+  }
+  if(player2.health<=0){
+    showMessage('PLAYER 1 WINS!');
+    setTimeout(resetRound,3000);
+    return true;
+  }
+  return false;
+}
+
+function showMessage(text){
+  const msg=document.getElementById('message');
+  msg.textContent=text;
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',2500);
+}
+
+function resetRound(){
+  player1.x=c.width*0.25;
+  player1.health=100;
+  player1.vx=0;
+  player1.action='idle';
+  player1.stunned=false;
+  player1.actionFrame=0;
+  
+  player2.x=c.width*0.75;
+  player2.health=100;
+  player2.vx=0;
+  player2.action='idle';
+  player2.stunned=false;
+  player2.actionFrame=0;
+  
+  round++;
+  document.getElementById('roundText').textContent='ROUND '+round;
+  gameState='playing';
+}
+
+function startGame(){
+  gameState='playing';
+  document.getElementById('titleScreen').style.display='none';
+  round=1;
+  resetRound();
+}
+
+function update(){
+  if(gameState!=='playing')return;
+  updatePlayer();
+  updateAI();
+  checkRoundEnd();
+}
+
+function draw(){
+  ctx.clearRect(0,0,c.width,c.height);
+  drawArena();
+  drawRobot(player1,'#0088ff');
+  drawRobot(player2,'#ff0044');
+  drawParticles();
+}
+
+// Controls
+let punchPressed=false;
+let kickPressed=false;
+let startPressed=false;
+
+function handleGamepad(){
+  const gp=navigator.getGamepads()[0];
+  if(!gp)return;
+  
+  if(gp.buttons[2]?.pressed && !startPressed){
+    startPressed=true;
+    if(gameState==='title')startGame();
+  }else if(!gp.buttons[2]?.pressed){
+    startPressed=false;
+  }
+  
+  if(gp.buttons[3]?.pressed && gameState==='title'){
+    window.location.href='index.html';
+  }
+  
+  if(gameState!=='playing')return;
+  
+  const axis=gp.axes[0];
+  if(Math.abs(axis)>0.3){
+    player1.vx=axis*3.5;
+    player1.facing=axis>0?1:-1;
+  }
+  
+  if(gp.buttons[7]?.pressed && !punchPressed && !player1.stunned && player1.actionTimer===0){
+    punchPressed=true;
+    player1.action='punch';
+    player1.actionTimer=30;
+    player1.actionFrame=0;
+  }else if(!gp.buttons[7]?.pressed){
+    punchPressed=false;
+  }
+  
+  if(gp.buttons[4]?.pressed && !kickPressed && !player1.stunned && player1.actionTimer===0){
+    kickPressed=true;
+    player1.action='kick';
+    player1.actionTimer=30;
+    player1.actionFrame=0;
+  }else if(!gp.buttons[4]?.pressed){
+    kickPressed=false;
+  }
+  
+  player1.blocking=gp.buttons[5]?.pressed||false;
+}
+
+function loop(){
+  handleGamepad();
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space' && gameState==='title')startGame();
+  if(gameState!=='playing')return;
+  
+  if(e.code==='ArrowLeft')player1.vx=-3.5;
+  if(e.code==='ArrowRight')player1.vx=3.5;
+  if(e.code==='KeyZ' && !player1.stunned && player1.actionTimer===0){
+    player1.action='punch';
+    player1.actionTimer=30;
+    player1.actionFrame=0;
+  }
+  if(e.code==='KeyX' && !player1.stunned && player1.actionTimer===0){
+    player1.action='kick';
+    player1.actionTimer=30;
+    player1.actionFrame=0;
+  }
+  if(e.code==='KeyC')player1.blocking=true;
+});
+
+document.addEventListener('keyup',e=>{
+  if(e.code==='KeyC')player1.blocking=false;
+});
+
+loop();
+</script>
+</body>
+</html>
