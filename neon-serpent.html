@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NEON SERPENT - Cyberpunk Snake</title>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background: linear-gradient(to bottom, #0A0A0F, #1A1A2E);
+  overflow:hidden;
+  font-family: 'Courier New', monospace;
+}
+#gameContainer{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:20px;
+}
+#scoreBoard{
+  display:flex;
+  gap:40px;
+  margin-bottom:20px;
+  font-size:24px;
+  font-weight:bold;
+}
+.score{color:#9D4EDD;}
+.highScore{color:#00F5FF;}
+.lives{color:#FF006E;}
+canvas{
+  border:4px solid #9D4EDD;
+  border-radius:8px;
+  box-shadow: 0 0 20px #9D4EDD;
+  background:#0A0A0F;
+}
+#overlay{
+  position:absolute;
+  top:0;
+  left:0;
+  width:900px;
+  height:600px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.9);
+  border-radius:8px;
+  text-align:center;
+}
+.title{
+  font-size:56px;
+  color:#9D4EDD;
+  text-shadow: 0 0 30px #9D4EDD;
+  margin-bottom:20px;
+  text-transform:uppercase;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+@keyframes glow{
+  from{text-shadow: 0 0 20px #9D4EDD;}
+  to{text-shadow: 0 0 40px #9D4EDD, 0 0 60px #9D4EDD;}
+}
+.subtitle{
+  font-size:20px;
+  color:#00F5FF;
+  margin-bottom:30px;
+}
+.instructions{
+  color:#fff;
+  font-size:16px;
+  line-height:2;
+  margin-bottom:30px;
+}
+.powerup-legend{
+  color:#aaa;
+  font-size:14px;
+  line-height:1.8;
+  margin-bottom:20px;
+}
+.powerup-item{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:15px;
+  margin:8px 0;
+}
+.powerup-box{
+  width:20px;
+  height:20px;
+  border-radius:4px;
+  box-shadow: 0 0 15px currentColor;
+}
+.cyan{background:#00F5FF; color:#00F5FF;}
+.pink{background:#FF006E; color:#FF006E;}
+.purple{background:#9D4EDD; color:#9D4EDD;}
+.startBtn{
+  padding:15px 30px;
+  background:#FF006E;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:20px;
+  font-weight:bold;
+  cursor:pointer;
+  box-shadow: 0 0 20px #FF006E;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.7;}
+}
+.scanline{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.15),
+    rgba(0,0,0,0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+  z-index:1000;
+}
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<div id="gameContainer">
+  <div id="scoreBoard">
+    <div class="score">SCORE: <span id="score">0</span></div>
+    <div class="highScore">HI: <span id="highScore">0</span></div>
+    <div class="lives">LIVES: <span id="lives">3</span></div>
+  </div>
+  <div style="position:relative;">
+    <canvas id="canvas" width="900" height="600"></canvas>
+    <div id="overlay">
+      <div class="title">NEON SERPENT</div>
+      <div class="subtitle">Cyberpunk Snake</div>
+      <div class="instructions">
+        <strong>CONTROLS:</strong><br>
+        Joystick: Move Snake<br>
+        START: Begin Game<br>
+        COIN: Return to Menu
+      </div>
+      <div class="powerup-legend">
+        <strong style="color:#00F5FF;">POWER-UPS:</strong><br>
+        <div class="powerup-item">
+          <div class="powerup-box cyan"></div>
+          <span>Speed Boost</span>
+        </div>
+        <div class="powerup-item">
+          <div class="powerup-box pink"></div>
+          <span>Invincibility</span>
+        </div>
+        <div class="powerup-item">
+          <div class="powerup-box purple"></div>
+          <span>Score Multiplier x2</span>
+        </div>
+      </div>
+      <div class="startBtn" onclick="startGame()">PRESS START</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+// Constants
+const GAME_WIDTH = 900;
+const GAME_HEIGHT = 600;
+const GRID_SIZE = 30;
+const COLS = GAME_WIDTH / GRID_SIZE;
+const ROWS = GAME_HEIGHT / GRID_SIZE;
+
+const COLORS = {
+  purple: '#9D4EDD',
+  purpleLight: '#C77DFF',
+  pink: '#FF006E',
+  cyan: '#00F5FF',
+  dark: '#0A0A0F',
+  grid: '#4A148C',
+  gold: '#FFD700',
+};
+
+const DIRECTIONS = {
+  UP: { x: 0, y: -1 },
+  DOWN: { x: 0, y: 1 },
+  LEFT: { x: -1, y: 0 },
+  RIGHT: { x: 1, y: 0 }
+};
+
+const POWERUP_TYPES = {
+  SPEED: { color: COLORS.cyan, duration: 300, name: 'Speed Boost' },
+  INVINCIBLE: { color: COLORS.pink, duration: 400, name: 'Invincibility' },
+  MULTIPLIER: { color: COLORS.purple, duration: 500, name: 'Score x2' }
+};
+
+// Game state
+let gameState = 'start';
+let score = 0;
+let highScore = localStorage.getItem('neonSerpentHighScore') || 0;
+let lives = 3;
+let snake = [];
+let direction = DIRECTIONS.RIGHT;
+let nextDirection = DIRECTIONS.RIGHT;
+let food = null;
+let powerup = null;
+let activePowerups = [];
+let baseSpeed = 150;
+let currentSpeed = 150;
+let lastMoveTime = 0;
+let particles = [];
+let frameCount = 0;
+let scoreMultiplier = 1;
+
+document.getElementById('highScore').textContent = highScore;
+document.getElementById('lives').textContent = lives;
+
+// Initialize snake
+function initSnake() {
+  snake = [
+    { x: 5, y: 10 },
+    { x: 4, y: 10 },
+    { x: 3, y: 10 }
+  ];
+  direction = DIRECTIONS.RIGHT;
+  nextDirection = DIRECTIONS.RIGHT;
+}
+
+// Random position
+function randomPos() {
+  return {
+    x: Math.floor(Math.random() * COLS),
+    y: Math.floor(Math.random() * ROWS)
+  };
+}
+
+// Check if position is valid (not on snake)
+function isValidPos(pos) {
+  return !snake.some(segment => segment.x === pos.x && segment.y === pos.y);
+}
+
+// Spawn food
+function spawnFood() {
+  let pos;
+  do {
+    pos = randomPos();
+  } while (!isValidPos(pos));
+  food = pos;
+}
+
+// Spawn powerup
+function spawnPowerup() {
+  if (Math.random() < 0.3 && !powerup) {
+    let pos;
+    do {
+      pos = randomPos();
+    } while (!isValidPos(pos) || (food && pos.x === food.x && pos.y === food.y));
+    
+    const types = Object.keys(POWERUP_TYPES);
+    const type = types[Math.floor(Math.random() * types.length)];
+    powerup = { ...pos, type };
+  }
+}
+
+// Draw grid
+function drawGrid() {
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.2;
+  
+  // Vertical lines
+  for (let x = 0; x <= COLS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * GRID_SIZE, 0);
+    ctx.lineTo(x * GRID_SIZE, GAME_HEIGHT);
+    ctx.stroke();
+  }
+  
+  // Horizontal lines
+  for (let y = 0; y <= ROWS; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * GRID_SIZE);
+    ctx.lineTo(GAME_WIDTH, y * GRID_SIZE);
+    ctx.stroke();
+  }
+  
+  ctx.globalAlpha = 1;
+}
+
+// Draw background effects
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+  gradient.addColorStop(0, COLORS.dark);
+  gradient.addColorStop(1, '#1A1A2E');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  
+  // Animated stars
+  ctx.fillStyle = COLORS.purple;
+  for (let i = 0; i < 30; i++) {
+    const x = (i * 137 + frameCount * 0.5) % GAME_WIDTH;
+    const y = (i * 79) % GAME_HEIGHT;
+    const size = (i % 3) + 1;
+    const alpha = (Math.sin(frameCount * 0.05 + i) + 1) / 2;
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillRect(x, y, size, size);
+  }
+  ctx.globalAlpha = 1;
+  
+  drawGrid();
+}
+
+// Draw snake
+function drawSnake() {
+  const isInvincible = activePowerups.some(p => p.type === 'INVINCIBLE');
+  
+  snake.forEach((segment, index) => {
+    const x = segment.x * GRID_SIZE;
+    const y = segment.y * GRID_SIZE;
+    
+    // Head is brighter
+    if (index === 0) {
+      ctx.fillStyle = isInvincible ? COLORS.pink : COLORS.purple;
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = isInvincible ? COLORS.pink : COLORS.purple;
+    } else {
+      const gradient = ctx.createLinearGradient(x, y, x + GRID_SIZE, y + GRID_SIZE);
+      gradient.addColorStop(0, isInvincible ? COLORS.pink : COLORS.purple);
+      gradient.addColorStop(1, isInvincible ? '#AA0044' : COLORS.purpleLight);
+      ctx.fillStyle = gradient;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = isInvincible ? COLORS.pink : COLORS.purple;
+    }
+    
+    ctx.fillRect(x + 2, y + 2, GRID_SIZE - 4, GRID_SIZE - 4);
+    ctx.shadowBlur = 0;
+    
+    // Inner glow
+    ctx.strokeStyle = COLORS.cyan;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 4, y + 4, GRID_SIZE - 8, GRID_SIZE - 8);
+    
+    // Head eyes
+    if (index === 0) {
+      ctx.fillStyle = COLORS.cyan;
+      const eyeSize = 4;
+      if (direction === DIRECTIONS.RIGHT) {
+        ctx.fillRect(x + GRID_SIZE - 10, y + 8, eyeSize, eyeSize);
+        ctx.fillRect(x + GRID_SIZE - 10, y + GRID_SIZE - 12, eyeSize, eyeSize);
+      } else if (direction === DIRECTIONS.LEFT) {
+        ctx.fillRect(x + 6, y + 8, eyeSize, eyeSize);
+        ctx.fillRect(x + 6, y + GRID_SIZE - 12, eyeSize, eyeSize);
+      } else if (direction === DIRECTIONS.UP) {
+        ctx.fillRect(x + 8, y + 6, eyeSize, eyeSize);
+        ctx.fillRect(x + GRID_SIZE - 12, y + 6, eyeSize, eyeSize);
+      } else {
+        ctx.fillRect(x + 8, y + GRID_SIZE - 10, eyeSize, eyeSize);
+        ctx.fillRect(x + GRID_SIZE - 12, y + GRID_SIZE - 10, eyeSize, eyeSize);
+      }
+    }
+  });
+}
+
+// Draw food
+function drawFood() {
+  if (!food) return;
+  
+  const x = food.x * GRID_SIZE;
+  const y = food.y * GRID_SIZE;
+  const pulse = Math.sin(frameCount * 0.1) * 2;
+  
+  ctx.fillStyle = COLORS.gold;
+  ctx.shadowBlur = 20 + pulse;
+  ctx.shadowColor = COLORS.gold;
+  ctx.beginPath();
+  ctx.arc(x + GRID_SIZE / 2, y + GRID_SIZE / 2, GRID_SIZE / 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Inner glow
+  ctx.fillStyle = COLORS.cyan;
+  ctx.beginPath();
+  ctx.arc(x + GRID_SIZE / 2, y + GRID_SIZE / 2, GRID_SIZE / 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Draw powerup
+function drawPowerup() {
+  if (!powerup) return;
+  
+  const x = powerup.x * GRID_SIZE;
+  const y = powerup.y * GRID_SIZE;
+  const config = POWERUP_TYPES[powerup.type];
+  const pulse = Math.sin(frameCount * 0.15) * 3;
+  
+  ctx.fillStyle = config.color;
+  ctx.shadowBlur = 25 + pulse;
+  ctx.shadowColor = config.color;
+  ctx.fillRect(x + 4, y + 4, GRID_SIZE - 8, GRID_SIZE - 8);
+  ctx.shadowBlur = 0;
+  
+  // Border
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 6, y + 6, GRID_SIZE - 12, GRID_SIZE - 12);
+  
+  // Symbol
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const symbol = powerup.type === 'SPEED' ? '⚡' : powerup.type === 'INVINCIBLE' ? '⭐' : '×2';
+  ctx.fillText(symbol, x + GRID_SIZE / 2, y + GRID_SIZE / 2);
+}
+
+// Draw particles
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    p.size *= 0.95;
+    
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Create particles
+function createParticles(x, y, color, count = 15) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x * GRID_SIZE + GRID_SIZE / 2,
+      y: y * GRID_SIZE + GRID_SIZE / 2,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      life: 30,
+      maxLife: 30,
+      size: Math.random() * 8 + 4,
+      color: color
+    });
+  }
+}
+
+// Update game
+function update(timestamp) {
+  if (gameState !== 'playing') return;
+  
+  frameCount++;
+  
+  // Update powerups
+  activePowerups = activePowerups.filter(p => {
+    p.duration--;
+    return p.duration > 0;
+  });
+  
+  // Update speed and multiplier
+  const hasSpeed = activePowerups.some(p => p.type === 'SPEED');
+  scoreMultiplier = activePowerups.some(p => p.type === 'MULTIPLIER') ? 2 : 1;
+  currentSpeed = hasSpeed ? baseSpeed / 2 : baseSpeed;
+  
+  // Move snake
+  if (timestamp - lastMoveTime > currentSpeed) {
+    lastMoveTime = timestamp;
+    
+    direction = nextDirection;
+    const head = { ...snake[0] };
+    head.x += direction.x;
+    head.y += direction.y;
+    
+    // Check wall collision
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+      loseLife();
+      return;
+    }
+    
+    // Check self collision (unless invincible)
+    const isInvincible = activePowerups.some(p => p.type === 'INVINCIBLE');
+    if (!isInvincible && snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+      loseLife();
+      return;
+    }
+    
+    snake.unshift(head);
+    
+    // Check food
+    if (food && head.x === food.x && head.y === food.y) {
+      const points = 10 * scoreMultiplier;
+      score += points;
+      document.getElementById('score').textContent = score;
+      createParticles(food.x, food.y, COLORS.gold);
+      spawnFood();
+      spawnPowerup();
+      
+      // Increase difficulty
+      if (snake.length % 5 === 0) {
+        baseSpeed = Math.max(50, baseSpeed - 10);
+      }
+    } else {
+      snake.pop();
+    }
+    
+    // Check powerup
+    if (powerup && head.x === powerup.x && head.y === powerup.y) {
+      const config = POWERUP_TYPES[powerup.type];
+      activePowerups.push({ type: powerup.type, duration: config.duration });
+      createParticles(powerup.x, powerup.y, config.color, 20);
+      powerup = null;
+    }
+  }
+}
+
+// Draw
+function draw() {
+  ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  
+  drawBackground();
+  drawFood();
+  drawPowerup();
+  drawSnake();
+  drawParticles();
+  
+  // Draw active powerup indicators
+  let yOffset = 10;
+  activePowerups.forEach(p => {
+    const config = POWERUP_TYPES[p.type];
+    ctx.fillStyle = config.color;
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'left';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = config.color;
+    const timeLeft = Math.ceil(p.duration / 60);
+    ctx.fillText(`${config.name}: ${timeLeft}s`, 10, yOffset);
+    ctx.shadowBlur = 0;
+    yOffset += 25;
+  });
+}
+
+// Lose life
+function loseLife() {
+  lives--;
+  document.getElementById('lives').textContent = lives;
+  
+  // Death particles
+  createParticles(snake[0].x, snake[0].y, COLORS.pink, 30);
+  
+  if (lives <= 0) {
+    gameOver();
+  } else {
+    // Reset position
+    initSnake();
+    activePowerups = [];
+    baseSpeed = Math.max(100, baseSpeed);
+  }
+}
+
+// Start game
+function startGame() {
+  initSnake();
+  spawnFood();
+  powerup = null;
+  activePowerups = [];
+  particles = [];
+  score = 0;
+  lives = 3;
+  baseSpeed = 150;
+  currentSpeed = 150;
+  scoreMultiplier = 1;
+  frameCount = 0;
+  lastMoveTime = 0;
+  gameState = 'playing';
+  overlay.style.display = 'none';
+  document.getElementById('score').textContent = '0';
+  document.getElementById('lives').textContent = lives;
+  gameLoop(0);
+}
+
+// Game over
+function gameOver() {
+  gameState = 'gameOver';
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('neonSerpentHighScore', highScore);
+    document.getElementById('highScore').textContent = highScore;
+  }
+  
+  overlay.innerHTML = `
+    <div class="title" style="font-size:48px;color:#FF006E;">GAME OVER</div>
+    <div class="subtitle" style="font-size:32px;margin-bottom:10px;">Score: ${score}</div>
+    <div class="subtitle" style="font-size:28px;margin-bottom:30px;">High Score: ${highScore}</div>
+    <div class="subtitle" style="font-size:20px;margin-bottom:20px;">Length: ${snake.length} segments</div>
+    <div class="startBtn" onclick="startGame()" style="margin-bottom:15px;">PRESS START TO RESTART</div>
+    <div style="color:#00F5FF;font-size:16px;">Press COIN to return to menu</div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+// Game loop
+function gameLoop(timestamp) {
+  if (gameState !== 'playing') return;
+  
+  update(timestamp);
+  draw();
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// Gamepad controls
+let lastAxisX = 0;
+let lastAxisY = 0;
+let startPressed = false;
+
+function handleGamepad() {
+  const gp = navigator.getGamepads()[0];
+  if (!gp) return;
+  
+  if (gameState === 'playing') {
+    // Joystick movement
+    const axisX = gp.axes[0];
+    const axisY = gp.axes[1];
+    const dead = 0.5;
+    
+    if (Math.abs(axisX) > dead || Math.abs(axisY) > dead) {
+      if (Math.abs(axisX) > Math.abs(axisY)) {
+        // Horizontal movement
+        if (axisX < -dead && direction !== DIRECTIONS.RIGHT) {
+          nextDirection = DIRECTIONS.LEFT;
+        } else if (axisX > dead && direction !== DIRECTIONS.LEFT) {
+          nextDirection = DIRECTIONS.RIGHT;
+        }
+      } else {
+        // Vertical movement
+        if (axisY < -dead && direction !== DIRECTIONS.DOWN) {
+          nextDirection = DIRECTIONS.UP;
+        } else if (axisY > dead && direction !== DIRECTIONS.UP) {
+          nextDirection = DIRECTIONS.DOWN;
+        }
+      }
+    }
+  }
+  
+  // Start button
+  const startButton = gp.buttons[2]?.pressed;
+  if (startButton && !startPressed) {
+    startPressed = true;
+    if (gameState !== 'playing') {
+      startGame();
+    }
+  } else if (!startButton) {
+    startPressed = false;
+  }
+  
+  // Coin button - return to menu
+  if (gp.buttons[3]?.pressed && (gameState === 'start' || gameState === 'gameOver')) {
+    window.location.href = 'index.html';
+  }
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (gameState === 'playing') {
+    if (e.code === 'ArrowUp' && direction !== DIRECTIONS.DOWN) {
+      nextDirection = DIRECTIONS.UP;
+      e.preventDefault();
+    } else if (e.code === 'ArrowDown' && direction !== DIRECTIONS.UP) {
+      nextDirection = DIRECTIONS.DOWN;
+      e.preventDefault();
+    } else if (e.code === 'ArrowLeft' && direction !== DIRECTIONS.RIGHT) {
+      nextDirection = DIRECTIONS.LEFT;
+      e.preventDefault();
+    } else if (e.code === 'ArrowRight' && direction !== DIRECTIONS.LEFT) {
+      nextDirection = DIRECTIONS.RIGHT;
+      e.preventDefault();
+    }
+  }
+  
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault();
+    if (gameState !== 'playing') {
+      startGame();
+    }
+  }
+});
+
+// Main loop
+function mainLoop() {
+  handleGamepad();
+  requestAnimationFrame(mainLoop);
+}
+mainLoop();
+</script>
+</body>
+</html>

@@ -227,6 +227,15 @@ html,body{
             Epic robot combat with punches, kicks, and blocks!
           </div>
         </div>
+        
+        <div class="game-card" id="game6" onclick="launchGame(5)">
+          <div class="game-icon">🐍</div>
+          <div class="game-title">NEON SERPENT</div>
+          <div class="game-desc">
+            Cyberpunk snake game! Eat data orbs, grow longer, and collect power-ups.
+            Speed boost, invincibility, and score multipliers!
+          </div>
+        </div>
       </div>
     </div>
     
@@ -243,7 +252,7 @@ html,body{
 
 <script>
 let selectedGame = 0;
-const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html'];
+const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html'];
 const gameCards = document.querySelectorAll('.game-card');
 const gamesContainer = document.getElementById('gamesContainer');
 const leftArrow = document.getElementById('leftArrow');
