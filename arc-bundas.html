@@ -734,10 +734,21 @@ function draw(){
 let k3Pressed = false
 let btn8Pressed = false
 let btn9Pressed = false
+let coinPressed = false
 
 function handleGamepad0(){
   const gp = navigator.getGamepads()[0]
   if(!gp) return
+
+  // COIN button (BTN 2) - Return to menu from selection screen or game over
+  if(gp.buttons[2]?.pressed && !coinPressed){
+    if(gameState === 'selection' || gameOver){
+      coinPressed = true
+      window.location.href = 'index.html'
+      return
+    }
+  }
+  if(!gp.buttons[2]?.pressed) coinPressed = false
 
   // START button (BTN 3) - Restart game when game over
   const k3Button = gp.buttons[3]?.pressed
@@ -748,12 +759,6 @@ function handleGamepad0(){
     return
   }
   if(!k3Button) k3Pressed = false
-  
-  // COIN button (BTN 2) - Return to menu when game over
-  if(gp.buttons[2]?.pressed && gameOver){
-    window.location.href = 'index.html'
-    return
-  }
   
   if(gameState !== 'playing' || gameOver || p1Dead) return
 
