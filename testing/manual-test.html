@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Manual Gamepad Simulator Test</title>
+<style>
+body {
+  margin: 20px;
+  font-family: 'Courier New', monospace;
+  background: #000;
+  color: #0f0;
+}
+h1 {
+  color: #0ff;
+  text-align: center;
+}
+.section {
+  border: 2px solid #0f0;
+  padding: 20px;
+  margin: 20px 0;
+  border-radius: 8px;
+}
+.status {
+  font-size: 18px;
+  margin: 10px 0;
+}
+.success { color: #0f0; }
+.error { color: #f00; }
+.info { color: #ff0; }
+button {
+  background: #0f0;
+  color: #000;
+  border: none;
+  padding: 15px 30px;
+  font-size: 18px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  margin: 10px 5px;
+  border-radius: 5px;
+}
+button:hover {
+  background: #0ff;
+}
+#gamepadData {
+  background: #111;
+  padding: 15px;
+  margin: 10px 0;
+  border: 1px solid #0f0;
+  border-radius: 5px;
+  font-size: 14px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.gamepad-status {
+  margin: 5px 0;
+  padding: 5px;
+}
+.button-pressed {
+  color: #f0f;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<h1>🎮 Gamepad Simulator Manual Test</h1>
+
+<div class="section">
+  <h2>Step 1: Load Simulator</h2>
+  <button onclick="loadSimulator()">Load Gamepad Simulator</button>
+  <div id="loadStatus" class="status"></div>
+</div>
+
+<div class="section">
+  <h2>Step 2: Create Virtual Gamepads</h2>
+  <button onclick="createGamepads()">Create 2 Virtual Gamepads</button>
+  <div id="createStatus" class="status"></div>
+</div>
+
+<div class="section">
+  <h2>Step 3: Test Controls</h2>
+  <button onclick="testPlayer1Fire()">P1: Fire Bullet (Btn 9)</button>
+  <button onclick="testPlayer1Laser()">P1: Fire Laser (Btn 8)</button>
+  <button onclick="testPlayer1Move()">P1: Move Forward</button>
+  <br>
+  <button onclick="testPlayer2Fire()">P2: Fire Bullet (Btn 3)</button>
+  <button onclick="testPlayer2Laser()">P2: Fire Laser (Btn 2)</button>
+  <button onclick="testPlayer2Move()">P2: Move Forward</button>
+  <div id="testStatus" class="status"></div>
+</div>
+
+<div class="section">
+  <h2>Step 4: Live Gamepad Data</h2>
+  <button onclick="startMonitoring()">Start Monitoring</button>
+  <button onclick="stopMonitoring()">Stop Monitoring</button>
+  <div id="gamepadData"></div>
+</div>
+
+<div class="section">
+  <h2>Step 5: Test with Arc Bundas</h2>
+  <div class="info status">
+    Open arc-bundas.html in a new tab, then press F12 to open console and paste:
+  </div>
+  <pre style="background: #222; padding: 10px; border: 1px solid #0f0; border-radius: 5px;">
+// This will make arc-bundas use your virtual gamepads!
+console.log('Checking for virtual gamepads:', navigator.getGamepads());
+  </pre>
+  <button onclick="openArcBundas()">Open Arc Bundas</button>
+</div>
+
+<script src="gamepad-simulator.js"></script>
+<script>
+let simulator = null;
+let monitorInterval = null;
+
+function log(elementId, message, className = 'info') {
+  const el = document.getElementById(elementId);
+  el.innerHTML = `<span class="${className}">${message}</span>`;
+}
+
+function loadSimulator() {
+  try {
+    simulator = new GamepadSimulator();
+    simulator.inject();
+    log('loadStatus', '✅ Simulator loaded and injected successfully!', 'success');
+    console.log('[Test] Gamepad simulator loaded');
+  } catch (error) {
+    log('loadStatus', '❌ Error loading simulator: ' + error.message, 'error');
+    console.error(error);
+  }
+}
+
+function createGamepads() {
+  if (!simulator) {
+    log('createStatus', '❌ Load simulator first!', 'error');
+    return;
+  }
+  
+  try {
+    simulator.createGamepad(0, 'Virtual Player 1');
+    simulator.createGamepad(1, 'Virtual Player 2');
+    
+    const gamepads = navigator.getGamepads();
+    log('createStatus', `✅ Created 2 gamepads! Check: GP0=${gamepads[0]?.id}, GP1=${gamepads[1]?.id}`, 'success');
+    console.log('[Test] Gamepads created:', gamepads);
+  } catch (error) {
+    log('createStatus', '❌ Error creating gamepads: ' + error.message, 'error');
+    console.error(error);
+  }
+}
+
+function testPlayer1Fire() {
+  if (!simulator) {
+    log('testStatus', '❌ Load simulator first!', 'error');
+    return;
+  }
+  
+  simulator.setButton(0, 9, true);
+  log('testStatus', '🔫 Player 1 firing bullet! (Button 9 pressed)', 'success');
+  
+  setTimeout(() => {
+    simulator.setButton(0, 9, false);
+    log('testStatus', '✅ Player 1 bullet released', 'info');
+  }, 200);
+}
+
+function testPlayer1Laser() {
+  if (!simulator) return;
+  
+  simulator.setButton(0, 8, true);
+  log('testStatus', '⚡ Player 1 firing LASER! (Button 8 pressed)', 'success');
+  
+  setTimeout(() => {
+    simulator.setButton(0, 8, false);
+    log('testStatus', '✅ Player 1 laser released', 'info');
+  }, 200);
+}
+
+function testPlayer1Move() {
+  if (!simulator) return;
+  
+  simulator.setAxis(0, 1, -1.0);
+  log('testStatus', '🚀 Player 1 moving forward! (Axis 1 = -1.0)', 'success');
+  
+  setTimeout(() => {
+    simulator.setAxis(0, 1, 0);
+    log('testStatus', '✅ Player 1 stopped', 'info');
+  }, 1000);
+}
+
+function testPlayer2Fire() {
+  if (!simulator) return;
+  
+  simulator.setButton(1, 3, true);
+  log('testStatus', '🔫 Player 2 firing bullet! (Button 3 pressed)', 'success');
+  
+  setTimeout(() => {
+    simulator.setButton(1, 3, false);
+    log('testStatus', '✅ Player 2 bullet released', 'info');
+  }, 200);
+}
+
+function testPlayer2Laser() {
+  if (!simulator) return;
+  
+  simulator.setButton(1, 2, true);
+  log('testStatus', '⚡ Player 2 firing LASER! (Button 2 pressed)', 'success');
+  
+  setTimeout(() => {
+    simulator.setButton(1, 2, false);
+    log('testStatus', '✅ Player 2 laser released', 'info');
+  }, 200);
+}
+
+function testPlayer2Move() {
+  if (!simulator) return;
+  
+  simulator.setAxis(1, 1, -1.0);
+  log('testStatus', '🚀 Player 2 moving forward! (Axis 1 = -1.0)', 'success');
+  
+  setTimeout(() => {
+    simulator.setAxis(1, 1, 0);
+    log('testStatus', '✅ Player 2 stopped', 'info');
+  }, 1000);
+}
+
+function startMonitoring() {
+  if (monitorInterval) return;
+  
+  monitorInterval = setInterval(() => {
+    const gamepads = navigator.getGamepads();
+    let html = '<div style="color: #0ff; margin-bottom: 10px;">Live Gamepad Data:</div>';
+    
+    gamepads.forEach((gp, index) => {
+      if (gp) {
+        html += `<div class="gamepad-status">
+          <strong>Gamepad ${index}:</strong> ${gp.id}<br>
+          <strong>Buttons:</strong> `;
+        
+        gp.buttons.forEach((btn, i) => {
+          if (btn.pressed) {
+            html += `<span class="button-pressed">[${i}:ON] </span>`;
+          }
+        });
+        
+        html += `<br><strong>Axes:</strong> `;
+        gp.axes.forEach((axis, i) => {
+          if (Math.abs(axis) > 0.1) {
+            html += `<span class="button-pressed">[${i}:${axis.toFixed(2)}] </span>`;
+          }
+        });
+        
+        html += '</div>';
+      }
+    });
+    
+    document.getElementById('gamepadData').innerHTML = html;
+  }, 100);
+  
+  log('testStatus', '📊 Monitoring started', 'success');
+}
+
+function stopMonitoring() {
+  if (monitorInterval) {
+    clearInterval(monitorInterval);
+    monitorInterval = null;
+    log('testStatus', '⏸️ Monitoring stopped', 'info');
+  }
+}
+
+function openArcBundas() {
+  window.open('../arc-bundas.html', '_blank');
+}
+
+// Auto-load on page load
+window.addEventListener('load', () => {
+  log('loadStatus', 'Ready to load simulator...', 'info');
+});
+</script>
+
+</body>
+</html>

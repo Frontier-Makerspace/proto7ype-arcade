@@ -1,0 +1,76 @@
+name: Arcade Game Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  test:
+    name: Test Arc Bundas
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: 📦 Install dependencies
+      run: npm ci
+    
+    - name: 🎮 Run automated game test
+      run: npm test
+      env:
+        HEADLESS: true
+        SCREENSHOT: true
+    
+    - name: 📸 Upload screenshots
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-screenshots
+        path: |
+          test-start.png
+          test-end.png
+        if-no-files-found: ignore
+    
+    - name: ✅ Test passed
+      if: success()
+      run: |
+        echo "🎉 All tests passed!"
+        echo "Both players achieved positive scores"
+        echo "Game is ready for deployment"
+    
+    - name: ❌ Test failed
+      if: failure()
+      run: |
+        echo "⚠️ Tests failed!"
+        echo "Check the test output and screenshots for details"
+        exit 1
+
+  # Future: Add deployment job that runs after tests pass
+  # deploy:
+  #   name: Deploy to Arcade Cabinet
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   
+  #   steps:
+  #   - name: 📥 Checkout code
+  #     uses: actions/checkout@v4
+  #   
+  #   - name: 🚀 Deploy to cabinet
+  #     run: |
+  #       # Add your deployment script here
+  #       # Examples:
+  #       # - rsync to cabinet via SSH
+  #       # - Copy to network share
+  #       # - Trigger cabinet to pull from git
+  #       echo "Deploy step - customize based on your setup"
