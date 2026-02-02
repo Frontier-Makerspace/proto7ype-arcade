@@ -66,79 +66,202 @@ h1{
   padding-top:40px;
   border-top:2px solid #0f0;
 }
+.gamepad-container{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:30px;
+  margin:20px 0;
+}
+.gamepad-section{
+  border:3px solid #0f0;
+  border-radius:10px;
+  padding:20px;
+  background:#050505;
+}
+.gamepad-section.p1{
+  border-color:#0f0;
+}
+.gamepad-section.p2{
+  border-color:#0ff;
+}
+.gamepad-section.p2 .button{
+  border-color:#0ff;
+}
+.gamepad-section.p2 .button.pressed{
+  background:#0ff;
+  border-color:#0ff;
+  box-shadow:0 0 20px #0ff;
+}
+.gamepad-header{
+  font-size:32px;
+  font-weight:bold;
+  text-align:center;
+  margin-bottom:20px;
+  padding-bottom:15px;
+  border-bottom:2px solid;
+}
+.gamepad-section.p1 .gamepad-header{
+  color:#0f0;
+  border-bottom-color:#0f0;
+}
+.gamepad-section.p2 .gamepad-header{
+  color:#0ff;
+  border-bottom-color:#0ff;
+}
+.status{
+  text-align:center;
+  font-size:20px;
+  padding:20px;
+  color:#f00;
+}
 </style>
 </head>
 <body>
-<h1>🎮 ARCADE BUTTON TESTER</h1>
+<h1>🎮 ARCADE DUAL CONTROLLER TESTER</h1>
 <div class="instructions">
   Press buttons on your arcade cabinet to see their numbers<br>
-  <span class="highlight">Look for K2 (COIN) and K3 (START) buttons!</span>
+  <span class="highlight">Gamepad 0: COIN/START | Gamepad 1: 1P/2P SELECT</span>
 </div>
 <div id="output"></div>
 
 <script>
 const output = document.getElementById('output');
-let lastPressed = [];
+let lastPressed0 = [];
+let lastPressed1 = [];
 
 function updateGamepad(){
-  const gp = navigator.getGamepads()[0];
-  if(!gp){
-    output.innerHTML = '<div class="button"><div class="button-label">No gamepad detected</div><div class="button-value">Please connect and press a button</div></div>';
-    return;
-  }
+  const gamepads = navigator.getGamepads();
+  const gp0 = gamepads[0];
+  const gp1 = gamepads[1];
   
-  let html = '<div style="color:#0ff; font-size:28px; margin-bottom:20px; text-align:center;">Gamepad: ' + gp.id + '</div>';
+  let html = '<div class="gamepad-container">';
   
-  // Track which buttons are currently pressed
-  const currentPressed = [];
+  // Gamepad 0 Section (Main Controller)
+  html += '<div class="gamepad-section p1">';
+  html += '<div class="gamepad-header">🎮 GAMEPAD 0<br>MAIN CONTROLLER</div>';
   
-  gp.buttons.forEach((btn, i) => {
-    const pressed = btn.pressed ? ' pressed' : '';
-    const label = getButtonLabel(i);
-    html += `<div class="button${pressed}">
-      <div class="button-label">Button ${i}${label}</div>
-      <div class="button-value">${btn.pressed ? '🔥 PRESSED!' : 'Not pressed'}</div>
-    </div>`;
+  if(!gp0){
+    html += '<div class="status">❌ Not Connected</div>';
+  } else {
+    html += `<div style="color:#0f0; font-size:18px; margin-bottom:15px; text-align:center;">ID: ${gp0.id}</div>`;
     
-    if(btn.pressed && !lastPressed.includes(i)){
-      console.log(`Button ${i} pressed${label}`);
-      currentPressed.push(i);
+    const currentPressed0 = [];
+    gp0.buttons.forEach((btn, i) => {
+      const pressed = btn.pressed ? ' pressed' : '';
+      const label = getButtonLabel0(i);
+      html += `<div class="button${pressed}">
+        <div class="button-label">Button ${i}${label}</div>
+        <div class="button-value">${btn.pressed ? '🔥 PRESSED!' : ''}</div>
+      </div>`;
+      
+      if(btn.pressed && !lastPressed0.includes(i)){
+        console.log(`GP0 Button ${i} pressed${label}`);
+        currentPressed0.push(i);
+      }
+    });
+    lastPressed0 = currentPressed0;
+    
+    // Show axes for GP0
+    if(gp0.axes.length > 0){
+      html += '<div class="axes"><div style="color:#0f0; font-size:20px; margin-bottom:10px;">Joystick:</div>';
+      gp0.axes.forEach((axis, i) => {
+        const val = axis.toFixed(3);
+        const moving = Math.abs(axis) > 0.2 ? ' pressed' : '';
+        html += `<div class="button${moving}">
+          <div class="button-label">Axis ${i} ${getAxisLabel(i)}</div>
+          <div class="button-value">${val}</div>
+        </div>`;
+      });
+      html += '</div>';
     }
-  });
-  
-  lastPressed = currentPressed;
-  
-  // Show axes
-  html += '<div class="axes"><div style="color:#0ff; font-size:24px; margin-bottom:15px;">Joystick Axes:</div>';
-  gp.axes.forEach((axis, i) => {
-    const val = axis.toFixed(3);
-    const moving = Math.abs(axis) > 0.2 ? ' pressed' : '';
-    html += `<div class="button${moving}">
-      <div class="button-label">Axis ${i} ${getAxisLabel(i)}</div>
-      <div class="button-value">${val}</div>
-    </div>`;
-  });
+  }
   html += '</div>';
   
+  // Gamepad 1 Section (Player Select)
+  html += '<div class="gamepad-section p2">';
+  html += '<div class="gamepad-header">🎮 GAMEPAD 1<br>1P/2P SELECT</div>';
+  
+  if(!gp1){
+    html += '<div class="status">❌ Not Connected</div>';
+  } else {
+    html += `<div style="color:#0ff; font-size:18px; margin-bottom:15px; text-align:center;">ID: ${gp1.id}</div>`;
+    
+    const currentPressed1 = [];
+    gp1.buttons.forEach((btn, i) => {
+      const pressed = btn.pressed ? ' pressed' : '';
+      const label = getButtonLabel1(i);
+      html += `<div class="button${pressed}">
+        <div class="button-label">Button ${i}${label}</div>
+        <div class="button-value">${btn.pressed ? '🔥 PRESSED!' : ''}</div>
+      </div>`;
+      
+      if(btn.pressed && !lastPressed1.includes(i)){
+        console.log(`GP1 Button ${i} pressed${label}`);
+        currentPressed1.push(i);
+      }
+    });
+    lastPressed1 = currentPressed1;
+    
+    // Show axes for GP1
+    if(gp1.axes.length > 0){
+      html += '<div class="axes"><div style="color:#0ff; font-size:20px; margin-bottom:10px;">Joystick:</div>';
+      gp1.axes.forEach((axis, i) => {
+        const val = axis.toFixed(3);
+        const moving = Math.abs(axis) > 0.2 ? ' pressed' : '';
+        html += `<div class="button${moving}">
+          <div class="button-label">Axis ${i} ${getAxisLabel(i)}</div>
+          <div class="button-value">${val}</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  
+  html += '</div>';
   output.innerHTML = html;
 }
 
-function getButtonLabel(i){
+function getButtonLabel0(i){
   const labels = {
-    0: ' (❌)',
-    1: ' (🔴)',
-    2: ' (⬜)',
-    3: ' (🔺)',
-    4: ' (Top)',
-    5: ' (Left)',
-    6: ' (Right)',
-    7: ' (Down)',
-    8: ' (SE?)',
-    9: ' (ST?)',
-    10: ' (K3/Start?)',
-    11: ' (K3/Start?)',
-    12: ' (K2/Coin?)',
-    13: ' (K2/Coin?)',
+    0: ' (Button 0)',
+    1: ' (Button 1)',
+    2: ' 🪙 COIN',
+    3: ' ▶️ START',
+    4: ' ⬇️ DOWN',
+    5: ' ⬅️ LEFT',
+    6: ' ➡️ RIGHT',
+    7: ' ⬆️ UP',
+    8: ' 🔫 ACTION 1 (P1)',
+    9: ' 🔫 ACTION 2 (P1)',
+    10: ' (Button 10)',
+    11: ' (Button 11)',
+    12: ' (Button 12)',
+    13: ' (Button 13)',
+    14: ' (Button 14)',
+    15: ' (Button 15)',
+  };
+  return labels[i] || '';
+}
+
+function getButtonLabel1(i){
+  const labels = {
+    0: ' (Button 0)',
+    1: ' (Button 1)',
+    2: ' 🔫 ACTION 1 (P2)',
+    3: ' 🔫 ACTION 2 (P2)',
+    4: ' ⬇️ DOWN',
+    5: ' ⬅️ LEFT',
+    6: ' ➡️ RIGHT',
+    7: ' ⬆️ UP',
+    8: ' 🎮 1P SELECT',
+    9: ' 🎮 2P SELECT',
+    10: ' (Button 10)',
+    11: ' (Button 11)',
+    12: ' (Button 12)',
+    13: ' (Button 13)',
+    14: ' (Button 14)',
+    15: ' (Button 15)',
   };
   return labels[i] || '';
 }

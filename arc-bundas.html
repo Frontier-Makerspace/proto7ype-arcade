@@ -28,14 +28,18 @@ window.addEventListener("resize", resize)
 resize()
 
 let paused=false
-let score=0, laserFlash=0
+let scoreP1=0, scoreP2=0
+let laserFlashP1=0, laserFlashP2=0
 let gameOver=false
+let p1Dead=false, p2Dead=false
 
-const ship={x:0,y:0,a:0,sp:3}
-const bullets=[], bundas=[], particles=[]
+const ship1={x:0,y:0,a:0,sp:3,color:"#0f0"}
+const ship2={x:0,y:0,a:0,sp:3,color:"#f0f"}
+const bulletsP1=[], bulletsP2=[], bundas=[], particles=[]
 
-let lastFire=0,lastLaser=0
-const fireDelay=180,laserDelay=1500
+let lastFireP1=0, lastFireP2=0
+let lastLaserP1=0, lastLaserP2=0
+const fireDelay=180, laserDelay=1500
 
 function clamp(o,r=0){
   o.x=Math.max(r, Math.min(c.width-r,o.x))
@@ -53,18 +57,32 @@ function spawnMeteor(){
 }
 
 function resetGame(){
-  ship.x=c.width/2
-  ship.y=c.height/2
-  ship.a=0
-  bullets.length=bundas.length=particles.length=0
-  score=0
+  ship1.x=c.width/3
+  ship1.y=c.height/2
+  ship1.a=0
+  ship2.x=c.width*2/3
+  ship2.y=c.height/2
+  ship2.a=0
+  bulletsP1.length=bulletsP2.length=bundas.length=particles.length=0
+  scoreP1=scoreP2=0
+  p1Dead=p2Dead=false
+  gameOver=false
   for(let i=0;i<6;i++) spawnMeteor()
 }
 
-function fire(){
+function fire(player){
   const t=performance.now()
+  const ship = player===1?ship1:ship2
+  const bullets = player===1?bulletsP1:bulletsP2
+  const lastFire = player===1?lastFireP1:lastFireP2
+  const isDead = player===1?p1Dead:p2Dead
+  
+  if(isDead) return
   if(t-lastFire<fireDelay) return
-  lastFire=t
+  
+  if(player===1) lastFireP1=t
+  else lastFireP2=t
+  
   bullets.push({
     x:ship.x+Math.cos(ship.a)*16,
     y:ship.y+Math.sin(ship.a)*16,
@@ -84,7 +102,6 @@ function explode(x,y){
 }
 
 function shipExplosion(x,y){
-  // Dramatic explosion with more particles
   for(let i=0;i<100;i++){
     particles.push({
       x,y,
@@ -95,11 +112,22 @@ function shipExplosion(x,y){
   }
 }
 
-function fireLaser(){
+function fireLaser(player){
   const t=performance.now()
+  const ship = player===1?ship1:ship2
+  const lastLaser = player===1?lastLaserP1:lastLaserP2
+  const isDead = player===1?p1Dead:p2Dead
+  
+  if(isDead) return
   if(t-lastLaser<laserDelay) return
-  lastLaser=t
-  laserFlash=6
+  
+  if(player===1){
+    lastLaserP1=t
+    laserFlashP1=6
+  } else {
+    lastLaserP2=t
+    laserFlashP2=6
+  }
 
   for(let i=bundas.length-1;i>=0;i--){
     const dx=bundas[i].x-ship.x
@@ -109,7 +137,8 @@ function fireLaser(){
     if(diff<0.12){
       explode(bundas[i].x,bundas[i].y)
       bundas.splice(i,1)
-      score+=300
+      if(player===1) scoreP1+=300
+      else scoreP2+=300
     }
   }
 }
@@ -119,24 +148,52 @@ function update(){
 
   if(Math.random()<0.015) spawnMeteor()
   
-  // Check ship collision with asteroids
-  for(let i=0;i<bundas.length;i++){
-    const dx=bundas[i].x-ship.x
-    const dy=bundas[i].y-ship.y
-    const dist=Math.sqrt(dx*dx+dy*dy)
-    if(dist<bundas[i].s/2+15){
-      // Ship hit asteroid!
-      shipExplosion(ship.x,ship.y)
-      gameOver=true
-      return
+  // Check ship collisions with asteroids
+  if(!p1Dead){
+    for(let i=0;i<bundas.length;i++){
+      const dx=bundas[i].x-ship1.x
+      const dy=bundas[i].y-ship1.y
+      const dist=Math.sqrt(dx*dx+dy*dy)
+      if(dist<bundas[i].s/2+15){
+        shipExplosion(ship1.x,ship1.y)
+        p1Dead=true
+        break
+      }
     }
   }
+  
+  if(!p2Dead){
+    for(let i=0;i<bundas.length;i++){
+      const dx=bundas[i].x-ship2.x
+      const dy=bundas[i].y-ship2.y
+      const dist=Math.sqrt(dx*dx+dy*dy)
+      if(dist<bundas[i].s/2+15){
+        shipExplosion(ship2.x,ship2.y)
+        p2Dead=true
+        break
+      }
+    }
+  }
+  
+  // Check if both players are dead
+  if(p1Dead && p2Dead){
+    gameOver=true
+  }
 
-  bullets.forEach((b,i)=>{
+  // Update P1 bullets
+  bulletsP1.forEach((b,i)=>{
     b.x+=Math.cos(b.a)*b.v
     b.y+=Math.sin(b.a)*b.v
     if(b.x<0||b.x>c.width||b.y<0||b.y>c.height)
-      bullets.splice(i,1)
+      bulletsP1.splice(i,1)
+  })
+  
+  // Update P2 bullets
+  bulletsP2.forEach((b,i)=>{
+    b.x+=Math.cos(b.a)*b.v
+    b.y+=Math.sin(b.a)*b.v
+    if(b.x<0||b.x>c.width||b.y<0||b.y>c.height)
+      bulletsP2.splice(i,1)
   })
 
   bundas.forEach(o=>{
@@ -154,24 +211,42 @@ function update(){
     if(particles[i].life<=0) particles.splice(i,1)
   }
 
+  // P1 bullets vs asteroids
   for(let i=bundas.length-1;i>=0;i--){
-    for(let j=bullets.length-1;j>=0;j--){
-      const dx=bundas[i].x-bullets[j].x
-      const dy=bundas[i].y-bullets[j].y
+    for(let j=bulletsP1.length-1;j>=0;j--){
+      const dx=bundas[i].x-bulletsP1[j].x
+      const dy=bundas[i].y-bulletsP1[j].y
       if(dx*dx+dy*dy<bundas[i].s*bundas[i].s){
         explode(bundas[i].x,bundas[i].y)
         bundas.splice(i,1)
-        bullets.splice(j,1)
-        score+=100
+        bulletsP1.splice(j,1)
+        scoreP1+=100
+        break
+      }
+    }
+  }
+  
+  // P2 bullets vs asteroids
+  for(let i=bundas.length-1;i>=0;i--){
+    for(let j=bulletsP2.length-1;j>=0;j--){
+      const dx=bundas[i].x-bulletsP2[j].x
+      const dy=bundas[i].y-bulletsP2[j].y
+      if(dx*dx+dy*dy<bundas[i].s*bundas[i].s){
+        explode(bundas[i].x,bundas[i].y)
+        bundas.splice(i,1)
+        bulletsP2.splice(j,1)
+        scoreP2+=100
         break
       }
     }
   }
 
-  clamp(ship,20)
+  if(!p1Dead) clamp(ship1,20)
+  if(!p2Dead) clamp(ship2,20)
 }
 
-function drawShip(){
+function drawShip(ship, isDead){
+  if(isDead) return
   ctx.save()
   ctx.translate(ship.x,ship.y)
   ctx.rotate(ship.a)
@@ -181,7 +256,7 @@ function drawShip(){
   ctx.lineTo(-8,0)
   ctx.lineTo(-14,10)
   ctx.closePath()
-  ctx.strokeStyle="#0f0"
+  ctx.strokeStyle=ship.color
   ctx.lineWidth=2
   ctx.stroke()
   ctx.restore()
@@ -189,41 +264,56 @@ function drawShip(){
 
 function drawInstructions(){
   const lines = [
-    "Joystick L/R: Rotate",
-    "Joystick/Top: Forward",
-    "Joystick/Down: Back",
-    "Left/Right: Strafe",
-    "SE: Big LASER",
-    "ST: Small Gun"
+    "P1: Joystick=Move/Rotate",
+    "P1: Btn8=LASER Btn9=Gun",
+    "P2: Joystick=Move/Rotate",
+    "P2: Btn2=LASER Btn3=Gun"
   ]
   ctx.font="13px monospace"
-  ctx.fillStyle="#0f0"
+  ctx.fillStyle="#ff0"
   lines.forEach((t,i)=>{
-    ctx.fillText(t,20,25+i*17)
+    ctx.fillText(t,c.width-220,25+i*17)
   })
 }
 
 function draw(){
-  ctx.fillStyle=`rgba(0,0,0,${laserFlash?0.12:0.35})`
+  ctx.fillStyle=`rgba(0,0,0,${(laserFlashP1||laserFlashP2)?0.12:0.35})`
   ctx.fillRect(0,0,c.width,c.height)
 
-  if(laserFlash){
+  if(laserFlashP1){
     ctx.strokeStyle="#0ff"
     ctx.lineWidth=10
     ctx.beginPath()
-    ctx.moveTo(ship.x,ship.y)
+    ctx.moveTo(ship1.x,ship1.y)
     ctx.lineTo(
-      ship.x+Math.cos(ship.a)*2000,
-      ship.y+Math.sin(ship.a)*2000
+      ship1.x+Math.cos(ship1.a)*2000,
+      ship1.y+Math.sin(ship1.a)*2000
     )
     ctx.stroke()
-    laserFlash--
+    laserFlashP1--
+  }
+  
+  if(laserFlashP2){
+    ctx.strokeStyle="#f8f"
+    ctx.lineWidth=10
+    ctx.beginPath()
+    ctx.moveTo(ship2.x,ship2.y)
+    ctx.lineTo(
+      ship2.x+Math.cos(ship2.a)*2000,
+      ship2.y+Math.sin(ship2.a)*2000
+    )
+    ctx.stroke()
+    laserFlashP2--
   }
 
-  if(!gameOver) drawShip()
+  drawShip(ship1, p1Dead)
+  drawShip(ship2, p2Dead)
 
   ctx.fillStyle="#aff"
-  bullets.forEach(b=>ctx.fillRect(b.x,b.y,3,3))
+  bulletsP1.forEach(b=>ctx.fillRect(b.x,b.y,3,3))
+  
+  ctx.fillStyle="#faf"
+  bulletsP2.forEach(b=>ctx.fillRect(b.x,b.y,3,3))
 
   ctx.strokeStyle="#888"
   ctx.lineWidth=2
@@ -238,9 +328,29 @@ function draw(){
     ctx.globalAlpha=1
   })
 
-  ctx.fillStyle="#0f0"
+  // Scores
   ctx.font="20px monospace"
-  ctx.fillText("SCORE "+score,20,25)
+  ctx.fillStyle="#0f0"
+  ctx.fillText("P1: "+scoreP1,20,25)
+  
+  ctx.fillStyle="#f0f"
+  ctx.textAlign="right"
+  ctx.fillText("P2: "+scoreP2,c.width-20,25)
+  ctx.textAlign="left"
+  
+  // Player death indicators
+  if(p1Dead && !gameOver){
+    ctx.fillStyle="#f00"
+    ctx.font="16px monospace"
+    ctx.fillText("P1 DEAD",20,50)
+  }
+  if(p2Dead && !gameOver){
+    ctx.fillStyle="#f00"
+    ctx.font="16px monospace"
+    ctx.textAlign="right"
+    ctx.fillText("P2 DEAD",c.width-20,50)
+    ctx.textAlign="left"
+  }
 
   // scanlines
   ctx.fillStyle="rgba(0,0,0,0.12)"
@@ -257,34 +367,36 @@ function draw(){
     ctx.fillStyle="#f00"
     ctx.font="80px monospace"
     ctx.textAlign="center"
-    ctx.fillText("GAME OVER",c.width/2,c.height/2-50)
+    ctx.fillText("GAME OVER",c.width/2,c.height/2-80)
     
     ctx.fillStyle="#0f0"
-    ctx.font="40px monospace"
-    ctx.fillText("FINAL SCORE: "+score,c.width/2,c.height/2+30)
+    ctx.font="30px monospace"
+    ctx.fillText("P1 SCORE: "+scoreP1,c.width/2,c.height/2-20)
+    
+    ctx.fillStyle="#f0f"
+    ctx.font="30px monospace"
+    ctx.fillText("P2 SCORE: "+scoreP2,c.width/2,c.height/2+20)
     
     ctx.fillStyle="#ff0"
     ctx.font="25px monospace"
-    ctx.fillText("PRESS START TO RESTART",c.width/2,c.height/2+100)
+    ctx.fillText("PRESS START TO RESTART",c.width/2,c.height/2+80)
     
     ctx.fillStyle="#0ff"
     ctx.font="20px monospace"
-    ctx.fillText("PRESS COIN TO RETURN TO MENU",c.width/2,c.height/2+140)
+    ctx.fillText("PRESS COIN TO RETURN TO MENU",c.width/2,c.height/2+120)
     
     ctx.textAlign="left"
   }
 }
 
-let pausePressed = false
-let lastPauseTime = 0
 let k3Pressed = false
 
-function gamepad(){
+function handleGamepad0(){
   const gp = navigator.getGamepads()[0]
   if(!gp) return
 
-  // K3 (Start) button (BTN 2) - Restart game when game over
-  const k3Button = gp.buttons[2]?.pressed
+  // START button (BTN 3) - Restart game when game over
+  const k3Button = gp.buttons[3]?.pressed
   if(k3Button && !k3Pressed && gameOver){
     k3Pressed = true
     gameOver = false
@@ -293,73 +405,117 @@ function gamepad(){
   }
   if(!k3Button) k3Pressed = false
   
-  // K2 (Coin) button (BTN 3) - Return to menu when game over
-  if(gp.buttons[3]?.pressed && gameOver){
+  // COIN button (BTN 2) - Return to menu when game over
+  if(gp.buttons[2]?.pressed && gameOver){
     window.location.href = 'index.html'
     return
   }
   
-  if(gameOver) return  // Don't process other controls when game over
+  if(gameOver || p1Dead) return
 
   const ax=gp.axes[0], ay=gp.axes[1]
   const dead=0.18
   
   // Joystick X-axis: Rotate ship
-  if(Math.abs(ax)>dead) ship.a+=ax*0.05
+  if(Math.abs(ax)>dead) ship1.a+=ax*0.05
 
   // Joystick Y-axis: Move forward/backward
   if(Math.abs(ay)>dead){
-    ship.x += Math.cos(ship.a) * (-ay) * ship.sp
-    ship.y += Math.sin(ship.a) * (-ay) * ship.sp
+    ship1.x += Math.cos(ship1.a) * (-ay) * ship1.sp
+    ship1.y += Math.sin(ship1.a) * (-ay) * ship1.sp
   }
   
-  // Top button (BTN 7) - Move forward
-  if(gp.buttons[7].pressed){
-    ship.x += Math.cos(ship.a) * ship.sp
-    ship.y += Math.sin(ship.a) * ship.sp
+  // UP button (BTN 7) - Move forward
+  if(gp.buttons[7]?.pressed){
+    ship1.x += Math.cos(ship1.a) * ship1.sp
+    ship1.y += Math.sin(ship1.a) * ship1.sp
   }
   
-  // Down button (BTN 4) - Move backward
-  if(gp.buttons[4].pressed){
-    ship.x -= Math.cos(ship.a) * ship.sp
-    ship.y -= Math.sin(ship.a) * ship.sp
+  // DOWN button (BTN 4) - Move backward
+  if(gp.buttons[4]?.pressed){
+    ship1.x -= Math.cos(ship1.a) * ship1.sp
+    ship1.y -= Math.sin(ship1.a) * ship1.sp
   }
   
-  // Left button (BTN 5) - Strafe left
-  if(gp.buttons[5].pressed){
-    ship.x += Math.cos(ship.a - Math.PI/2) * ship.sp
-    ship.y += Math.sin(ship.a - Math.PI/2) * ship.sp
+  // LEFT button (BTN 5) - Strafe left
+  if(gp.buttons[5]?.pressed){
+    ship1.x += Math.cos(ship1.a - Math.PI/2) * ship1.sp
+    ship1.y += Math.sin(ship1.a - Math.PI/2) * ship1.sp
   }
   
-  // Right button (BTN 6) - Strafe right
-  if(gp.buttons[6].pressed){
-    ship.x += Math.cos(ship.a + Math.PI/2) * ship.sp
-    ship.y += Math.sin(ship.a + Math.PI/2) * ship.sp
+  // RIGHT button (BTN 6) - Strafe right
+  if(gp.buttons[6]?.pressed){
+    ship1.x += Math.cos(ship1.a + Math.PI/2) * ship1.sp
+    ship1.y += Math.sin(ship1.a + Math.PI/2) * ship1.sp
   }
 
-  // SE button - Fire LASER (big gun)
-  // Try buttons 8, 9, 10, 11, 12 for SE
+  // ACTION 1 (BTN 8) - Fire LASER
   if(gp.buttons[8]?.pressed) {
-    fireLaser()
+    fireLaser(1)
   }
   
-  // ST button - Fire bullets (small gun)  
-  // Try next button for ST
+  // ACTION 2 (BTN 9) - Fire bullets
   if(gp.buttons[9]?.pressed) {
-    fire()
+    fire(1)
+  }
+}
+
+function handleGamepad1(){
+  const gp = navigator.getGamepads()[1]
+  if(!gp) return
+  
+  if(gameOver || p2Dead) return
+
+  const ax=gp.axes[0], ay=gp.axes[1]
+  const dead=0.18
+  
+  // Joystick X-axis: Rotate ship
+  if(Math.abs(ax)>dead) ship2.a+=ax*0.05
+
+  // Joystick Y-axis: Move forward/backward
+  if(Math.abs(ay)>dead){
+    ship2.x += Math.cos(ship2.a) * (-ay) * ship2.sp
+    ship2.y += Math.sin(ship2.a) * (-ay) * ship2.sp
   }
   
-  // Fallback: Also try buttons 10/11 in case SE/ST are there
-  if(gp.buttons[10]?.pressed) {
-    fireLaser()
+  // UP button (BTN 7) - Move forward
+  if(gp.buttons[7]?.pressed){
+    ship2.x += Math.cos(ship2.a) * ship2.sp
+    ship2.y += Math.sin(ship2.a) * ship2.sp
   }
-  if(gp.buttons[11]?.pressed) {
-    fire()
+  
+  // DOWN button (BTN 4) - Move backward
+  if(gp.buttons[4]?.pressed){
+    ship2.x -= Math.cos(ship2.a) * ship2.sp
+    ship2.y -= Math.sin(ship2.a) * ship2.sp
+  }
+  
+  // LEFT button (BTN 5) - Strafe left
+  if(gp.buttons[5]?.pressed){
+    ship2.x += Math.cos(ship2.a - Math.PI/2) * ship2.sp
+    ship2.y += Math.sin(ship2.a - Math.PI/2) * ship2.sp
+  }
+  
+  // RIGHT button (BTN 6) - Strafe right
+  if(gp.buttons[6]?.pressed){
+    ship2.x += Math.cos(ship2.a + Math.PI/2) * ship2.sp
+    ship2.y += Math.sin(ship2.a + Math.PI/2) * ship2.sp
+  }
+
+  // ACTION 1 (BTN 2) - Fire LASER
+  if(gp.buttons[2]?.pressed) {
+    fireLaser(2)
+  }
+  
+  // ACTION 2 (BTN 3) - Fire bullets
+  if(gp.buttons[3]?.pressed) {
+    fire(2)
   }
 }
 
 function loop(){
-  gamepad()
+  handleGamepad0()
+  handleGamepad1()
   update()
   draw()
   requestAnimationFrame(loop)
