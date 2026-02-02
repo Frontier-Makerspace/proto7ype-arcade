@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+g!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -172,7 +172,7 @@ c.width=innerWidth;
 c.height=innerHeight;
 
 let gameState='title';
-let round=1;
+let round=0;
 let particles=[];
 
 const player1={
@@ -417,8 +417,12 @@ function checkHit(attacker,defender){
   const range=150;
   
   if(distance<range && !defender.blocking && !defender.stunned){
-    const damage=attacker.action==='kick'?15:10;
-    defender.health=Math.max(0,defender.health-damage);
+    // Progressive damage - AI gets stronger each round
+    let baseDamage=attacker.action==='kick'?20:15;
+    if(attacker===player2){
+      baseDamage+=Math.floor(round*2); // +2 damage per round for AI
+    }
+    defender.health=Math.max(0,defender.health-baseDamage);
     defender.stunned=true;
     defender.stunnedTimer=15;
     
@@ -485,28 +489,45 @@ function updateAI(){
     player2.actionFrame=0;
   }
   
+  // Progressive AI difficulty
+  const reactionTime=Math.max(20,50-round*3); // Faster each round (50->20 frames)
+  const moveSpeed=2.5+round*0.3; // Faster movement each round
+  const aggression=0.5+round*0.05; // More aggressive each round
+  
   // AI logic
   player2.aiTimer++;
   const distance=Math.abs(player2.x-player1.x);
   
-  if(player2.aiTimer>60){
+  // Block when player is attacking nearby
+  if(player1.action==='punch' || player1.action==='kick'){
+    if(distance<180 && Math.random()<0.4+round*0.05){
+      player2.blocking=true;
+      setTimeout(()=>player2.blocking=false,400);
+    }
+  }
+  
+  if(player2.aiTimer>reactionTime){
     player2.aiTimer=0;
     
-    if(distance>200){
-      player2.vx=player1.x>player2.x?-2.5:2.5;
-    }else if(distance<170){
+    if(distance>220){
+      // Chase player aggressively
+      player2.vx=player1.x>player2.x?-moveSpeed:moveSpeed;
+    }else if(distance<190){
       const r=Math.random();
-      if(r<0.35){
-        player2.action='punch';
+      // Much more aggressive attack rate
+      if(r<aggression){
+        // Mix up attacks better
+        if(Math.random()<0.6){
+          player2.action='punch';
+        }else{
+          player2.action='kick';
+        }
         player2.actionTimer=30;
         player2.actionFrame=0;
-      }else if(r<0.65){
-        player2.action='kick';
-        player2.actionTimer=30;
-        player2.actionFrame=0;
-      }else{
+      }else if(r<aggression+0.15){
+        // Strategic blocking
         player2.blocking=true;
-        setTimeout(()=>player2.blocking=false,700);
+        setTimeout(()=>player2.blocking=false,600);
       }
     }
   }
@@ -563,7 +584,7 @@ function resetRound(){
 function startGame(){
   gameState='playing';
   document.getElementById('titleScreen').style.display='none';
-  round=1;
+  round=0;
   resetRound();
 }
 
