@@ -1,0 +1,25 @@
+{
+  "name": "proto7ype-arcade",
+  "version": "1.0.0",
+  "description": "Arcade cabinet games with automated testing",
+  "scripts": {
+    "test": "node testing/test-runner.js",
+    "test:watch": "HEADLESS=false node testing/test-runner.js",
+    "test:screenshot": "SCREENSHOT=true node testing/test-runner.js",
+    "test:debug": "HEADLESS=false SLOWMO=50 SCREENSHOT=true node testing/test-runner.js"
+  },
+  "keywords": [
+    "arcade",
+    "games",
+    "testing",
+    "puppeteer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
