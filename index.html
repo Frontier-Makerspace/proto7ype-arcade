@@ -141,6 +141,51 @@ html,body{
   box-shadow:0 0 15px rgba(0,245,255,0.6);
 }
 
+/* Special Cline Defenders cartridge styling */
+.cartridge-cline{
+  background:radial-gradient(circle at center,
+    #ff1493 0%,
+    #9d4edd 20%,
+    #4cc9f0 40%,
+    #7209b7 60%,
+    #ff006e 80%,
+    #ff1493 100%);
+  background-size:200% 200%;
+  border-color:#ff00ff;
+  animation:rainbowPulse 6s ease-in-out infinite;
+  box-shadow:0 0 20px rgba(255,0,255,0.5);
+}
+@keyframes rainbowPulse{
+  0%{background-position:0% 50%;border-color:#ff00ff;}
+  25%{background-position:100% 50%;border-color:#00ffff;}
+  50%{background-position:100% 100%;border-color:#ff1493;}
+  75%{background-position:0% 100%;border-color:#9d4edd;}
+  100%{background-position:0% 50%;border-color:#ff00ff;}
+}
+
+.cartridge-cline .cartridge-label{
+  color:#fff;
+  text-shadow:0 0 10px #9d4edd,0 0 20px #ff00ff;
+  font-weight:900;
+}
+
+.cartridge-cline.selected{
+  border-color:#ff00ff;
+  border-width:5px;
+  box-shadow:0 0 50px rgba(255,0,255,0.8),inset 0 0 40px rgba(255,0,255,0.3);
+  transform:translateX(25px);
+}
+
+.cartridge-cline.selected .cartridge-label{
+  color:#fff;
+  text-shadow:0 0 20px #ff00ff,0 0 40px #9d4edd;
+}
+
+.cartridge-cline:hover:not(.selected){
+  border-color:#ff00ff;
+  box-shadow:0 0 30px rgba(255,0,255,0.6);
+}
+
 .crt-container{
   flex:1;
   display:flex;flex-direction:column;
@@ -334,7 +379,7 @@ html,body{
       <span class="cart-icon">🐍</span>
       <div class="cartridge-label">NEON SERPENT</div>
     </div>
-    <div class="cartridge" data-game="6">
+    <div class="cartridge cartridge-cline" data-game="6">
       <span class="cart-icon">🤖</span>
       <div class="cartridge-label">CLINE DEFENDERS</div>
       <span class="player-badge">2P</span>
