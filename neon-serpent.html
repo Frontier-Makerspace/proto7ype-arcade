@@ -627,53 +627,59 @@ function gameLoop(timestamp) {
 }
 
 // Gamepad controls
-let lastAxisX = 0;
-let lastAxisY = 0;
-let startPressed = false;
+let player1ButtonPressed = false;
+let coinPressed = false;
 
 function handleGamepad() {
-  const gp = navigator.getGamepads()[0];
-  if (!gp) return;
+  // Gamepad 0 - Main controller
+  const gp0 = navigator.getGamepads()[0];
   
-  if (gameState === 'playing') {
-    // Joystick movement
-    const axisX = gp.axes[0];
-    const axisY = gp.axes[1];
-    const dead = 0.5;
-    
-    if (Math.abs(axisX) > dead || Math.abs(axisY) > dead) {
-      if (Math.abs(axisX) > Math.abs(axisY)) {
-        // Horizontal movement
-        if (axisX < -dead && direction !== DIRECTIONS.RIGHT) {
-          nextDirection = DIRECTIONS.LEFT;
-        } else if (axisX > dead && direction !== DIRECTIONS.LEFT) {
-          nextDirection = DIRECTIONS.RIGHT;
-        }
-      } else {
-        // Vertical movement
-        if (axisY < -dead && direction !== DIRECTIONS.DOWN) {
-          nextDirection = DIRECTIONS.UP;
-        } else if (axisY > dead && direction !== DIRECTIONS.UP) {
-          nextDirection = DIRECTIONS.DOWN;
+  // Gamepad 1 - Player select controller
+  const gp1 = navigator.getGamepads()[1];
+  
+  if (gp0) {
+    if (gameState === 'playing') {
+      // Joystick movement
+      const axisX = gp0.axes[0];
+      const axisY = gp0.axes[1];
+      const dead = 0.5;
+      
+      if (Math.abs(axisX) > dead || Math.abs(axisY) > dead) {
+        if (Math.abs(axisX) > Math.abs(axisY)) {
+          // Horizontal movement
+          if (axisX < -dead && direction !== DIRECTIONS.RIGHT) {
+            nextDirection = DIRECTIONS.LEFT;
+          } else if (axisX > dead && direction !== DIRECTIONS.LEFT) {
+            nextDirection = DIRECTIONS.RIGHT;
+          }
+        } else {
+          // Vertical movement
+          if (axisY < -dead && direction !== DIRECTIONS.DOWN) {
+            nextDirection = DIRECTIONS.UP;
+          } else if (axisY > dead && direction !== DIRECTIONS.UP) {
+            nextDirection = DIRECTIONS.DOWN;
+          }
         }
       }
     }
-  }
-  
-  // Start button
-  const startButton = gp.buttons[2]?.pressed;
-  if (startButton && !startPressed) {
-    startPressed = true;
-    if (gameState !== 'playing') {
-      startGame();
+    
+    // COIN button (button 2) - return to menu
+    if (gp0.buttons[2]?.pressed && !coinPressed && (gameState === 'start' || gameState === 'gameOver')) {
+      coinPressed = true;
+      window.location.href = 'index.html';
+    } else if (!gp0.buttons[2]?.pressed) {
+      coinPressed = false;
     }
-  } else if (!startButton) {
-    startPressed = false;
   }
   
-  // Coin button - return to menu
-  if (gp.buttons[3]?.pressed && (gameState === 'start' || gameState === 'gameOver')) {
-    window.location.href = 'index.html';
+  if (gp1) {
+    // Button 8 = 1P SELECT (starts game)
+    if (gp1.buttons[8]?.pressed && !player1ButtonPressed && (gameState === 'start' || gameState === 'gameOver')) {
+      player1ButtonPressed = true;
+      startGame();
+    } else if (!gp1.buttons[8]?.pressed) {
+      player1ButtonPressed = false;
+    }
   }
 }
 
