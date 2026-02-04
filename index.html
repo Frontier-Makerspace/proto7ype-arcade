@@ -116,6 +116,31 @@ html,body{
   filter:drop-shadow(0 0 10px currentColor);
 }
 
+.player-badge{
+  position:absolute;
+  top:8px;right:20px;
+  background:rgba(0,245,255,0.2);
+  border:2px solid #00F5FF;
+  border-radius:4px;
+  padding:2px 8px;
+  font-size:14px;
+  font-weight:bold;
+  color:#00F5FF;
+  text-shadow:0 0 10px #00F5FF;
+  z-index:3;
+  animation:badgePulse 2s ease-in-out infinite;
+}
+@keyframes badgePulse{
+  0%,100%{opacity:0.8;transform:scale(1);}
+  50%{opacity:1;transform:scale(1.05);}
+}
+
+.cartridge.selected .player-badge{
+  border-color:#00F5FF;
+  background:rgba(0,245,255,0.3);
+  box-shadow:0 0 15px rgba(0,245,255,0.6);
+}
+
 .crt-container{
   flex:1;
   display:flex;flex-direction:column;
@@ -209,6 +234,20 @@ html,body{
   line-height:1.8;
 }
 
+.preview-multiplayer{
+  margin-top:20px;
+  font-size:16px;
+  font-weight:bold;
+  color:#00F5FF;
+  text-shadow:0 0 15px #00F5FF;
+  text-align:center;
+  animation:multiplayerGlow 2s ease-in-out infinite alternate;
+}
+@keyframes multiplayerGlow{
+  from{opacity:0.7;}
+  to{opacity:1;}
+}
+
 .scanlines{
   position:absolute;inset:0;
   background:repeating-linear-gradient(
@@ -272,6 +311,7 @@ html,body{
     <div class="cartridge selected" data-game="0">
       <span class="cart-icon">🚀</span>
       <div class="cartridge-label">ARC BUNDAS</div>
+      <span class="player-badge">2P</span>
     </div>
     <div class="cartridge" data-game="1">
       <span class="cart-icon">🗡️</span>
@@ -288,6 +328,7 @@ html,body{
     <div class="cartridge" data-game="4">
       <span class="cart-icon">🤖</span>
       <div class="cartridge-label">UFB</div>
+      <span class="player-badge">2P</span>
     </div>
     <div class="cartridge" data-game="5">
       <span class="cart-icon">🐍</span>
@@ -296,6 +337,7 @@ html,body{
     <div class="cartridge" data-game="6">
       <span class="cart-icon">🤖</span>
       <div class="cartridge-label">CLINE DEFENDERS</div>
+      <span class="player-badge">2P</span>
     </div>
   </div>
 
@@ -309,6 +351,7 @@ html,body{
             Classic space shooter! Destroy asteroids with bullets and lasers.
             Large asteroids split into pieces. Probe enemies appear after 2 minutes!
           </div>
+          <div class="preview-multiplayer">⚡ 2-PLAYER MODE AVAILABLE ⚡</div>
           <div class="preview-asteroid" style="top:20%;left:60%;"></div>
           <div class="preview-asteroid" style="top:70%;left:30%;animation-delay:-2s;"></div>
         </div>
@@ -347,6 +390,7 @@ html,body{
             Ultimate Fighting Bots! Control a Unitree humanoid robot.
             Epic robot combat with punches, kicks, and blocks!
           </div>
+          <div class="preview-multiplayer">⚡ 2-PLAYER MODE AVAILABLE ⚡</div>
         </div>
 
         <div class="game-preview" id="preview5">
@@ -365,6 +409,7 @@ html,body{
             Co-op space shooter! 1-2 players defend the codebase from bugs.
             Shoot npm packages and survive waves together!
           </div>
+          <div class="preview-multiplayer">⚡ 2-PLAYER MODE AVAILABLE ⚡</div>
         </div>
       </div>
     </div>
