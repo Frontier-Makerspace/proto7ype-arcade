@@ -22,14 +22,112 @@ html,body{
 }
 #scoreBoard{
   display:flex;
-  gap:60px;
-  margin-bottom:20px;
-  font-size:28px;
+  gap:40px;
+  margin-bottom:30px;
+  font-size:18px;
   font-weight:bold;
+  filter: drop-shadow(0 0 20px rgba(255,107,0,0.5));
 }
-.score{color:#00F5FF; text-shadow: 0 0 10px #00F5FF;}
-.health{color:#FF006E; text-shadow: 0 0 10px #FF006E;}
-.wave{color:#9D4EDD; text-shadow: 0 0 10px #9D4EDD;}
+.score, .health, .wave{
+  position:relative;
+  padding:15px 25px;
+  background: linear-gradient(180deg, rgba(20,10,0,0.95) 0%, rgba(40,20,5,0.98) 50%, rgba(20,10,0,0.95) 100%);
+  border: 2px solid rgba(255,107,0,0.3);
+  border-radius: 8px;
+  box-shadow: 
+    inset 0 2px 10px rgba(255,107,0,0.2),
+    inset 0 -2px 10px rgba(0,0,0,0.8),
+    0 0 30px rgba(255,107,0,0.4),
+    0 0 50px rgba(255,0,110,0.2);
+  animation: glitchFlicker 3s infinite;
+}
+.score::before, .health::before, .wave::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background: linear-gradient(180deg, rgba(255,107,0,0.1) 0%, transparent 50%, rgba(255,107,0,0.05) 100%);
+  border-radius: 8px;
+  pointer-events:none;
+}
+.score::after, .health::after, .wave::after{
+  content:'';
+  position:absolute;
+  top:0;
+  left:-5px;
+  right:-5px;
+  bottom:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,107,0,0.03) 2px, rgba(255,107,0,0.03) 4px);
+  pointer-events:none;
+  animation: scanlineMove 8s linear infinite;
+}
+.score{
+  color:#FF6B00;
+  text-shadow: 
+    0 0 5px #FF6B00,
+    0 0 10px #FF6B00,
+    0 0 20px #FF6B00,
+    0 0 40px #FF3D00,
+    2px 2px 2px rgba(255,0,110,0.5),
+    -2px -2px 2px rgba(0,245,255,0.3);
+  animation: glitchFlicker 3s infinite, plasmaShift 4s ease-in-out infinite;
+}
+.health{
+  color:#FF006E;
+  text-shadow: 
+    0 0 5px #FF006E,
+    0 0 10px #FF006E,
+    0 0 20px #FF006E,
+    0 0 40px #FF006E,
+    2px 2px 2px rgba(157,78,221,0.5),
+    -2px -2px 2px rgba(0,245,255,0.3);
+  animation: glitchFlicker 3.5s infinite 0.5s, plasmaShift 4.5s ease-in-out infinite 1s;
+}
+.wave{
+  color:#9D4EDD;
+  text-shadow: 
+    0 0 5px #9D4EDD,
+    0 0 10px #9D4EDD,
+    0 0 20px #9D4EDD,
+    0 0 40px #C77DFF,
+    2px 2px 2px rgba(255,0,110,0.5),
+    -2px -2px 2px rgba(0,245,255,0.3);
+  animation: glitchFlicker 4s infinite 1s, plasmaShift 5s ease-in-out infinite 2s;
+}
+.score span, .health span, .wave span{
+  font-size: 48px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  letter-spacing: 4px;
+  display: inline-block;
+  animation: digitFlicker 0.1s infinite;
+}
+@keyframes glitchFlicker{
+  0%, 100%{opacity:1; transform:translateX(0);}
+  2%{opacity:0.8; transform:translateX(-2px);}
+  4%{opacity:1; transform:translateX(2px);}
+  6%{opacity:1; transform:translateX(0);}
+  93%{opacity:1; transform:translateX(0);}
+  95%{opacity:0.9; transform:translateX(1px);}
+  97%{opacity:1; transform:translateX(-1px);}
+  99%{opacity:1; transform:translateX(0);}
+}
+@keyframes digitFlicker{
+  0%, 100%{opacity:1;}
+  50%{opacity:0.95;}
+}
+@keyframes plasmaShift{
+  0%, 100%{filter: hue-rotate(0deg) brightness(1);}
+  25%{filter: hue-rotate(5deg) brightness(1.1);}
+  50%{filter: hue-rotate(-5deg) brightness(0.9);}
+  75%{filter: hue-rotate(5deg) brightness(1.1);}
+}
+@keyframes scanlineMove{
+  0%{transform:translateY(0);}
+  100%{transform:translateY(20px);}
+}
 canvas{
   border:6px solid #00F5FF;
   border-radius:12px;
@@ -61,19 +159,21 @@ canvas{
 #mascotCanvas{
   position:absolute;
   top:10px;
-  left:50%;
-  transform:translateX(-50%);
+  left:20px;
   z-index:10;
 }
 .fun-header{
-  font-size:22px;
+  position:absolute;
+  top:60px;
+  left:240px;
+  font-size:32px;
   font-weight:bold;
   color:#fff;
   text-shadow: 3px 3px 0 #ff00ff, -3px -3px 0 #00ffff;
-  margin-bottom:3px;
-  margin-top:190px;
   letter-spacing:2px;
+  text-align:left;
   animation: wobble 3s ease-in-out infinite;
+  z-index:10;
 }
 @keyframes wobble{
   0%,100%{transform:translateY(0px) rotate(0deg);}
@@ -81,7 +181,7 @@ canvas{
   75%{transform:translateY(-5px) rotate(2deg);}
 }
 .title{
-  font-size:48px;
+  font-size:64px;
   font-weight:bold;
   background: linear-gradient(45deg, #ff0080, #ff8c00, #ffed00, #00ff00, #00ffff, #0080ff, #8000ff);
   background-size: 200% 200%;
@@ -89,6 +189,7 @@ canvas{
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: rainbowText 3s linear infinite, float 4s ease-in-out infinite;
+  margin-top:260px;
   margin-bottom:8px;
   text-transform:uppercase;
   filter: drop-shadow(0 0 20px rgba(255,255,255,0.8));
@@ -113,16 +214,19 @@ canvas{
   to{text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 40px #00ffff, 0 0 60px #ff00ff;}
 }
 .branding{
-  font-size:36px;
+  position:absolute;
+  top:110px;
+  left:240px;
+  font-size:48px;
   color:#fff;
   text-shadow: 0 0 20px #00ffff, 0 0 40px #ff00ff;
-  margin-bottom:20px;
-  padding:12px 25px;
+  padding:10px 25px;
   background:rgba(0,0,0,0.5);
   border:4px solid;
   border-image: linear-gradient(45deg, #ff0080, #00ffff, #ffed00) 1;
   border-radius:12px;
   animation: borderPulse 2s ease-in-out infinite;
+  z-index:10;
 }
 @keyframes borderPulse{
   0%,100%{border-width:4px;}
@@ -577,6 +681,7 @@ class Enemy {
     if (this.y > GAME_HEIGHT) {
       this.active = false;
       health -= 10;
+      enemiesKilled++;  // Count missed enemies toward wave completion
       updateHealth();
     }
   }
