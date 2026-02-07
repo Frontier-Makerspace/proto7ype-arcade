@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>BEAT PROTOCOL - Rhythm Warfare</title>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background: linear-gradient(135deg, #0A0A0F 0%, #1A1A2E 50%, #0A0A0F 100%);
+  overflow:hidden;
+  font-family:'Courier New', monospace;
+  height:100vh;
+}
+#gameContainer{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:20px;
+}
+#scoreBoard{
+  display:flex;
+  gap:30px;
+  margin-bottom:20px;
+  font-size:18px;
+  font-weight:bold;
+  text-shadow:0 0 15px rgba(0,245,255,0.6);
+}
+.panel{
+  padding:12px 18px;
+  border:2px solid rgba(0,245,255,0.3);
+  border-radius:8px;
+  background:rgba(10,10,20,0.85);
+  box-shadow:0 0 20px rgba(0,245,255,0.2);
+}
+.p1{color:#00F5FF;}
+.p2{color:#FF006E;}
+.song{color:#9D4EDD;}
+.status{color:#FFD700;}
+
+canvas{
+  border:6px solid #00F5FF;
+  border-radius:12px;
+  box-shadow:0 0 40px rgba(0,245,255,0.6), inset 0 0 20px rgba(0,245,255,0.2);
+  background:#05050a;
+}
+
+#overlay{
+  position:absolute;
+  top:0;
+  left:0;
+  width:900px;
+  height:600px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.85);
+  border-radius:12px;
+  text-align:center;
+  padding:30px;
+}
+.title{
+  font-size:60px;
+  font-weight:bold;
+  color:#00F5FF;
+  text-shadow:0 0 30px #00F5FF, 0 0 60px #9D4EDD;
+  margin-bottom:10px;
+  text-transform:uppercase;
+}
+.subtitle{
+  font-size:22px;
+  color:#FF006E;
+  margin-bottom:25px;
+}
+.instructions{
+  color:#fff;
+  font-size:16px;
+  line-height:1.8;
+  margin-bottom:20px;
+}
+.player-select{
+  display:flex;
+  gap:20px;
+  margin-bottom:20px;
+}
+.player-option{
+  padding:14px 28px;
+  border:3px solid #9D4EDD;
+  border-radius:10px;
+  font-size:22px;
+  color:#fff;
+  cursor:pointer;
+  background:rgba(157,78,221,0.2);
+  box-shadow:0 0 15px rgba(157,78,221,0.4);
+  transition:all 0.2s ease;
+}
+.player-option.selected{
+  border-color:#00F5FF;
+  box-shadow:0 0 25px rgba(0,245,255,0.7);
+  transform:scale(1.05);
+}
+.startBtn{
+  padding:14px 30px;
+  background:#FF006E;
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  font-size:20px;
+  font-weight:bold;
+  cursor:pointer;
+  box-shadow:0 0 20px rgba(255,0,110,0.7);
+  animation:pulse 2s ease-in-out infinite;
+  margin-bottom:10px;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.05);}
+}
+.controls-hint{
+  color:#9D4EDD;
+  font-size:14px;
+}
+.scanlines{
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.15),
+    rgba(0,0,0,0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+  z-index:1000;
+}
+</style>
+</head>
+<body>
+
+<div class="scanlines"></div>
+
+<div id="gameContainer">
+  <div id="scoreBoard">
+    <div class="panel song">SONG: <span id="songTitle">BAD APPLE!!</span></div>
+    <div class="panel status">MODE: <span id="modeLabel">1P</span></div>
+    <div class="panel p1">P1 SCORE: <span id="p1Score">0</span> | COMBO: <span id="p1Combo">0</span></div>
+    <div class="panel p2" id="p2Panel">P2 SCORE: <span id="p2Score">0</span> | COMBO: <span id="p2Combo">0</span></div>
+  </div>
+  <div style="position:relative;">
+    <canvas id="canvas" width="900" height="600" style="position:relative;z-index:1;"></canvas>
+    <video id="bgVideo" style="position:absolute;top:0;left:0;width:900px;height:600px;object-fit:cover;opacity:0;border-radius:12px;pointer-events:none;z-index:2;filter:hue-rotate(290deg) saturate(1.3) brightness(0.9) contrast(1.1);mix-blend-mode:screen;" muted loop>
+      <source src="assets/bad-apple.mp4" type="video/mp4">
+    </video>
+    <div id="overlay" style="z-index:3;"></div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+const GAME_WIDTH = 900;
+const GAME_HEIGHT = 600;
+const HIT_LINE_Y = GAME_HEIGHT - 90;
+const NOTE_TRAVEL_TIME = 2000;
+const PERFECT_WINDOW = 70;
+const GOOD_WINDOW = 130;
+const MISS_WINDOW = 180;
+
+const COLORS = {
+  background: '#05050a',
+  grid: 'rgba(157,78,221,0.3)',
+  hitLine: '#00F5FF',
+  p1: '#00F5FF',
+  p2: '#FF006E',
+  text: '#ffffff'
+};
+
+const LANE_COLORS = ['#FF6EC7', '#B794F6', '#F687B3', '#FBD38D', '#81E6D9', '#D6BCFA'];
+const LANE_COLORS_DARK = ['#D946A6', '#9F7AEA', '#ED64A6', '#F6AD55', '#4FD1C5', '#B794F6'];
+
+const SONGS = {
+  'bad-apple': {
+    title: 'Bad Apple!!',
+    artist: 'Touhou (Arcade Remix)',
+    bpm: 138,
+    duration: 120000,
+    difficulty: 'Medium',
+    notes: []
+  }
+};
+
+function generateBadAppleNotes() {
+  const song = SONGS['bad-apple'];
+  const beatMs = 60000 / song.bpm;
+  const totalBeats = Math.floor(song.duration / beatMs);
+  const notes = [];
+  
+  const mainMelody = [0, 1, 2, 1, 0, 1, 2, 3];
+  const bassline = [4, 5, 4, 5];
+  const fillPattern = [3, 2, 1, 0, 5, 4];
+  
+  const startOffset = 3000;
+
+  for (let i = 0; i < totalBeats; i++) {
+    const time = startOffset + i * beatMs;
+    const bar = Math.floor(i / 8);
+    const beatInBar = i % 8;
+    const section = Math.floor(bar / 8) % 4;
+    
+    if (beatInBar === 0 || beatInBar === 2 || beatInBar === 4 || beatInBar === 6) {
+      const lane = mainMelody[beatInBar];
+      notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+    }
+    
+    if (section >= 2 && (beatInBar === 1 || beatInBar === 3 || beatInBar === 5)) {
+      const lane = fillPattern[beatInBar % fillPattern.length];
+      notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+    }
+    
+    if (beatInBar === 0 && bar % 4 === 0) {
+      const chordLane = bassline[bar % bassline.length];
+      notes.push({ time, lane: chordLane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+    }
+    
+    if (section === 3 && beatInBar === 7) {
+      for (let j = 0; j < 3; j++) {
+        const lane = (j * 2) % 6;
+        notes.push({ time: time + j * (beatMs / 3), lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+  }
+
+  notes.sort((a, b) => a.time - b.time);
+  song.notes = notes;
+}
+
+generateBadAppleNotes();
+
+let gameState = 'menu';
+let selectedPlayers = 1;
+let currentSongKey = 'bad-apple';
+let songStartTime = 0;
+let songTime = 0;
+let audioContext = null;
+let bgVideo = null;
+let particles = [];
+let latencyOffset = 0;
+
+const playerStats = [
+  { score: 0, combo: 0, maxCombo: 0, perfect: 0, good: 0, miss: 0, lastJudge: null, judgeTimer: 0 },
+  { score: 0, combo: 0, maxCombo: 0, perfect: 0, good: 0, miss: 0, lastJudge: null, judgeTimer: 0 }
+];
+
+const laneFlash = [
+  Array(6).fill(0),
+  Array(6).fill(0)
+];
+
+const lastButtons = {
+  p1: Array(16).fill(false),
+  p2: Array(16).fill(false)
+};
+
+const KEY_MAP = {
+  KeyA: 0,
+  KeyS: 1,
+  KeyD: 2,
+  KeyJ: 3,
+  KeyK: 4,
+  KeyL: 5
+};
+
+const GAMEPAD_P1 = {
+  5: 0,
+  4: 1,
+  7: 2,
+  6: 3,
+  8: 4,
+  9: 5
+};
+
+const GAMEPAD_P2 = {
+  5: 0,
+  4: 1,
+  7: 2,
+  6: 3,
+  2: 4,
+  3: 5
+};
+
+function resetStats() {
+  playerStats.forEach(stats => {
+    stats.score = 0;
+    stats.combo = 0;
+    stats.maxCombo = 0;
+    stats.perfect = 0;
+    stats.good = 0;
+    stats.miss = 0;
+    stats.lastJudge = null;
+    stats.judgeTimer = 0;
+  });
+
+  SONGS[currentSongKey].notes.forEach(note => {
+    note.hitP1 = false;
+    note.hitP2 = false;
+    note.missedP1 = false;
+    note.missedP2 = false;
+  });
+}
+
+function showMenu() {
+  gameState = 'menu';
+  overlay.innerHTML = `
+    <div class="title">BEAT PROTOCOL</div>
+    <div class="subtitle">Rhythm Warfare • ${SONGS[currentSongKey].title}</div>
+    <div class="instructions">
+      <strong>6-LANE ARCADE RHYTHM COMBAT</strong><br>
+      Hit notes when they cross the sync line.<br>
+      Perfect/Good timing builds combos and score.
+    </div>
+    <div class="player-select">
+      <div class="player-option ${selectedPlayers === 1 ? 'selected' : ''}" onclick="selectPlayers(1)">1 PLAYER</div>
+      <div class="player-option ${selectedPlayers === 2 ? 'selected' : ''}" onclick="selectPlayers(2)">2 PLAYERS</div>
+    </div>
+    <div class="instructions">
+      <strong>CONTROLS:</strong><br>
+      P1: LEFT/DOWN/UP/RIGHT + ACTION1/ACTION2<br>
+      P2: LEFT/DOWN/UP/RIGHT + ACTION1/ACTION2 (Gamepad 1)<br>
+      Keyboard: A S D J K L<br>
+      START: Begin • COIN: Return to Menu
+    </div>
+    <div class="startBtn" onclick="startGame()">PRESS START</div>
+    <div class="controls-hint">Use 1P/2P SELECT or Arrow Keys to choose players</div>
+  `;
+  overlay.style.display = 'flex';
+  document.getElementById('modeLabel').textContent = selectedPlayers === 2 ? '2P' : '1P';
+  document.getElementById('p2Panel').style.display = selectedPlayers === 2 ? 'block' : 'none';
+}
+
+function selectPlayers(count) {
+  selectedPlayers = count;
+  showMenu();
+}
+
+function startGame() {
+  resetStats();
+  gameState = 'playing';
+  overlay.style.display = 'none';
+  document.getElementById('modeLabel').textContent = selectedPlayers === 2 ? '2P' : '1P';
+  document.getElementById('p2Panel').style.display = selectedPlayers === 2 ? 'block' : 'none';
+  updateScoreUI();
+  
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  
+  if (!bgVideo) {
+    bgVideo = document.getElementById('bgVideo');
+    bgVideo.volume = 1.0;
+    bgVideo.muted = false;
+  }
+  
+  bgVideo.currentTime = 0;
+  bgVideo.style.opacity = '0.35';
+  bgVideo.play().catch(err => console.error('Video play failed:', err));
+  
+  songStartTime = performance.now();
+  songTime = 0;
+  particles = [];
+}
+
+function endGame() {
+  gameState = 'results';
+  
+  if (bgVideo) {
+    bgVideo.pause();
+    bgVideo.currentTime = 0;
+    bgVideo.style.opacity = '0';
+  }
+  
+  const p1 = playerStats[0];
+  const p2 = playerStats[1];
+  const p1Acc = calculateAccuracy(p1);
+  const p2Acc = calculateAccuracy(p2);
+  const winner = selectedPlayers === 2 ? (p1.score === p2.score ? 'TIE GAME' : p1.score > p2.score ? 'P1 WINS' : 'P2 WINS') : 'RUN COMPLETE';
+
+  overlay.innerHTML = `
+    <div class="title" style="font-size:48px;color:#FF006E;">${winner}</div>
+    <div class="subtitle">${SONGS[currentSongKey].title} • ${SONGS[currentSongKey].artist}</div>
+    <div class="instructions">
+      <strong>P1</strong> Score: ${p1.score} | Accuracy: ${p1Acc}% | Max Combo: ${p1.maxCombo}<br>
+      <strong>P1</strong> Perfect: ${p1.perfect} • Good: ${p1.good} • Miss: ${p1.miss}<br><br>
+      ${selectedPlayers === 2 ? `<strong>P2</strong> Score: ${p2.score} | Accuracy: ${p2Acc}% | Max Combo: ${p2.maxCombo}<br>
+      <strong>P2</strong> Perfect: ${p2.perfect} • Good: ${p2.good} • Miss: ${p2.miss}` : ''}
+    </div>
+    <div class="startBtn" onclick="startGame()">PRESS START TO REPLAY</div>
+    <div class="controls-hint">Press COIN to return to arcade menu</div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+function calculateAccuracy(stats) {
+  const total = stats.perfect + stats.good + stats.miss;
+  if (total === 0) return 0;
+  return Math.round(((stats.perfect * 1 + stats.good * 0.5) / total) * 100);
+}
+
+function updateScoreUI() {
+  document.getElementById('p1Score').textContent = playerStats[0].score;
+  document.getElementById('p1Combo').textContent = playerStats[0].combo;
+  if (selectedPlayers === 2) {
+    document.getElementById('p2Score').textContent = playerStats[1].score;
+    document.getElementById('p2Combo').textContent = playerStats[1].combo;
+  }
+}
+
+function playHitSound(lane) {
+  if (!audioContext) return;
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const base = 220 + lane * 40;
+  osc.frequency.value = base;
+  osc.type = 'triangle';
+  gain.gain.setValueAtTime(0.12, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
+  osc.connect(gain);
+  gain.connect(audioContext.destination);
+  osc.start();
+  osc.stop(audioContext.currentTime + 0.16);
+}
+
+function registerHit(playerIndex, lane) {
+  const stats = playerStats[playerIndex];
+  const notes = SONGS[currentSongKey].notes;
+  let bestNote = null;
+  let bestDelta = Infinity;
+
+  for (const note of notes) {
+    const hitKey = playerIndex === 0 ? 'hitP1' : 'hitP2';
+    const missKey = playerIndex === 0 ? 'missedP1' : 'missedP2';
+    if (note.lane !== lane || note[hitKey] || note[missKey]) continue;
+    const delta = Math.abs(note.time - songTime);
+    if (delta <= GOOD_WINDOW && delta < bestDelta) {
+      bestDelta = delta;
+      bestNote = note;
+    }
+  }
+
+  if (!bestNote) {
+    stats.combo = 0;
+    stats.miss += 1;
+    stats.lastJudge = 'MISS';
+    stats.judgeTimer = 30;
+    return;
+  }
+
+  const hitKey = playerIndex === 0 ? 'hitP1' : 'hitP2';
+  bestNote[hitKey] = true;
+  laneFlash[playerIndex][lane] = 12;
+
+  if (bestDelta <= PERFECT_WINDOW) {
+    stats.score += 100 + stats.combo * 2;
+    stats.combo += 1;
+    stats.perfect += 1;
+    stats.lastJudge = 'PERFECT';
+    const centerX = selectedPlayers === 2 ? (playerIndex === 0 ? GAME_WIDTH / 4 : GAME_WIDTH * 3 / 4) : GAME_WIDTH / 2;
+    createParticles(centerX + (lane - 2.5) * (selectedPlayers === 2 ? GAME_WIDTH / 12 : GAME_WIDTH / 6), HIT_LINE_Y, LANE_COLORS[lane], 'star', 8);
+    
+    if (stats.combo % 25 === 0 && stats.combo > 0) {
+      createParticles(centerX, HIT_LINE_Y - 60, '#FF69B4', 'heart', 6);
+    }
+  } else {
+    stats.score += 50 + stats.combo;
+    stats.combo += 1;
+    stats.good += 1;
+    stats.lastJudge = 'GOOD';
+    const centerX = selectedPlayers === 2 ? (playerIndex === 0 ? GAME_WIDTH / 4 : GAME_WIDTH * 3 / 4) : GAME_WIDTH / 2;
+    createParticles(centerX + (lane - 2.5) * (selectedPlayers === 2 ? GAME_WIDTH / 12 : GAME_WIDTH / 6), HIT_LINE_Y, LANE_COLORS[lane], 'star', 4);
+  }
+  stats.maxCombo = Math.max(stats.maxCombo, stats.combo);
+  stats.judgeTimer = 30;
+  playHitSound(lane);
+}
+
+function markMisses() {
+  const notes = SONGS[currentSongKey].notes;
+  for (const note of notes) {
+    if (!note.missedP1 && !note.hitP1 && note.time < songTime - MISS_WINDOW) {
+      note.missedP1 = true;
+      playerStats[0].combo = 0;
+      playerStats[0].miss += 1;
+      playerStats[0].lastJudge = 'MISS';
+      playerStats[0].judgeTimer = 30;
+    }
+    if (selectedPlayers === 2 && !note.missedP2 && !note.hitP2 && note.time < songTime - MISS_WINDOW) {
+      note.missedP2 = true;
+      playerStats[1].combo = 0;
+      playerStats[1].miss += 1;
+      playerStats[1].lastJudge = 'MISS';
+      playerStats[1].judgeTimer = 30;
+    }
+  }
+}
+
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+  gradient.addColorStop(0, '#0a0515');
+  gradient.addColorStop(0.5, '#1a0f2e');
+  gradient.addColorStop(1, '#0a0515');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  ctx.strokeStyle = 'rgba(180, 140, 250, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.3;
+  for (let x = 0; x <= GAME_WIDTH; x += 50) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, GAME_HEIGHT);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= GAME_HEIGHT; y += 50) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(GAME_WIDTH, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  
+  drawParticles();
+}
+
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.3;
+    p.life--;
+    p.size *= 0.96;
+    p.rotation += p.rotSpeed;
+    
+    if (p.life <= 0 || p.size < 0.5) {
+      particles.splice(i, 1);
+      continue;
+    }
+    
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    ctx.globalAlpha = p.life / p.maxLife;
+    
+    if (p.type === 'star') {
+      ctx.fillStyle = p.color;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = p.color;
+      drawStar(0, 0, 5, p.size, p.size * 0.5);
+    } else if (p.type === 'heart') {
+      ctx.fillStyle = p.color;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = p.color;
+      drawHeart(0, 0, p.size);
+    }
+    
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawStar(cx, cy, spikes, outerRadius, innerRadius) {
+  let rot = Math.PI / 2 * 3;
+  let x = cx;
+  let y = cy;
+  const step = Math.PI / spikes;
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - outerRadius);
+  
+  for (let i = 0; i < spikes; i++) {
+    x = cx + Math.cos(rot) * outerRadius;
+    y = cy + Math.sin(rot) * outerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+
+    x = cx + Math.cos(rot) * innerRadius;
+    y = cy + Math.sin(rot) * innerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+  }
+  
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawHeart(cx, cy, size) {
+  const scale = size / 10;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 3 * scale);
+  ctx.bezierCurveTo(cx, cy + 1 * scale, cx - 4 * scale, cy - 3 * scale, cx, cy - 6 * scale);
+  ctx.bezierCurveTo(cx + 4 * scale, cy - 3 * scale, cx, cy + 1 * scale, cx, cy + 3 * scale);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function createParticles(x, y, color, type, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+    const speed = 2 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      life: 40 + Math.random() * 20,
+      maxLife: 60,
+      size: 8 + Math.random() * 6,
+      color,
+      type,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.2
+    });
+  }
+}
+
+function drawPlayerField(playerIndex, offsetX, fieldWidth) {
+  const laneWidth = fieldWidth / 6;
+  const notes = SONGS[currentSongKey].notes;
+  const laneLabels = ['LEFT', 'DOWN', 'UP', 'RIGHT', 'ACT1', 'ACT2'];
+
+  for (let lane = 0; lane < 6; lane++) {
+    const x = offsetX + lane * laneWidth;
+    ctx.fillStyle = 'rgba(20,20,40,0.4)';
+    ctx.fillRect(x, 0, laneWidth - 2, GAME_HEIGHT);
+
+    if (laneFlash[playerIndex][lane] > 0) {
+      ctx.fillStyle = `${LANE_COLORS[lane]}33`;
+      ctx.fillRect(x, 0, laneWidth - 2, GAME_HEIGHT);
+      laneFlash[playerIndex][lane] -= 1;
+    }
+    
+    ctx.fillStyle = LANE_COLORS[lane];
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = LANE_COLORS[lane];
+    ctx.globalAlpha = 0.7;
+    ctx.fillText(laneLabels[lane], x + laneWidth / 2, GAME_HEIGHT - 20);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.strokeStyle = COLORS.hitLine;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(offsetX, HIT_LINE_Y);
+  ctx.lineTo(offsetX + fieldWidth, HIT_LINE_Y);
+  ctx.stroke();
+
+  notes.forEach(note => {
+    const hitKey = playerIndex === 0 ? 'hitP1' : 'hitP2';
+    const missKey = playerIndex === 0 ? 'missedP1' : 'missedP2';
+    if (note[hitKey] || note[missKey]) return;
+    const timeUntil = note.time - songTime;
+    const progress = 1 - (timeUntil / NOTE_TRAVEL_TIME);
+    const y = -50 + progress * (HIT_LINE_Y + 50);
+    if (y < -60 || y > GAME_HEIGHT + 60) return;
+
+    const lane = note.lane;
+    const x = offsetX + lane * laneWidth + laneWidth / 2;
+    const noteWidth = laneWidth * 0.65;
+    const noteHeight = 22;
+    const radius = noteHeight / 2;
+
+    const gradient = ctx.createLinearGradient(x - noteWidth/2, y - noteHeight/2, x + noteWidth/2, y + noteHeight/2);
+    gradient.addColorStop(0, LANE_COLORS[lane]);
+    gradient.addColorStop(1, LANE_COLORS_DARK[lane]);
+    
+    ctx.fillStyle = gradient;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = LANE_COLORS[lane];
+    
+    ctx.beginPath();
+    ctx.roundRect(x - noteWidth / 2, y - noteHeight / 2, noteWidth, noteHeight, radius);
+    ctx.fill();
+    
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.shadowBlur = 0;
+  });
+
+  const stats = playerStats[playerIndex];
+  if (stats.judgeTimer > 0 && stats.lastJudge) {
+    ctx.fillStyle = stats.lastJudge === 'PERFECT' ? '#00F5FF' : stats.lastJudge === 'GOOD' ? '#FFD700' : '#FF006E';
+    ctx.font = 'bold 24px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.fillText(stats.lastJudge, offsetX + fieldWidth / 2, HIT_LINE_Y - 40);
+    ctx.shadowBlur = 0;
+    stats.judgeTimer -= 1;
+  }
+}
+
+function draw() {
+  drawBackground();
+
+  if (selectedPlayers === 2) {
+    drawPlayerField(0, 0, GAME_WIDTH / 2);
+    drawPlayerField(1, GAME_WIDTH / 2, GAME_WIDTH / 2);
+    ctx.strokeStyle = '#9D4EDD';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(GAME_WIDTH / 2, 0);
+    ctx.lineTo(GAME_WIDTH / 2, GAME_HEIGHT);
+    ctx.stroke();
+  } else {
+    drawPlayerField(0, 0, GAME_WIDTH);
+  }
+}
+
+function update() {
+  if (gameState !== 'playing') return;
+  
+  if (bgVideo && !bgVideo.paused) {
+    songTime = bgVideo.currentTime * 1000 + latencyOffset;
+  } else {
+    songTime = performance.now() - songStartTime + latencyOffset;
+  }
+  
+  markMisses();
+  updateScoreUI();
+
+  if (bgVideo && bgVideo.ended) {
+    endGame();
+  } else if (songTime > SONGS[currentSongKey].duration + NOTE_TRAVEL_TIME) {
+    endGame();
+  }
+}
+
+function handleGamepad() {
+  const gp0 = navigator.getGamepads()[0];
+  const gp1 = navigator.getGamepads()[1];
+
+  if (gp0) {
+    if (gameState === 'menu') {
+      if (gp0.buttons[3]?.pressed) startGame();
+      if (gp0.buttons[2]?.pressed) window.location.href = 'index.html';
+    }
+
+    if (gameState === 'playing') {
+      Object.entries(GAMEPAD_P1).forEach(([btn, lane]) => {
+        const pressed = gp0.buttons[btn]?.pressed;
+        if (pressed && !lastButtons.p1[btn]) {
+          registerHit(0, lane);
+        }
+        lastButtons.p1[btn] = pressed;
+      });
+    }
+
+    if (gameState === 'results') {
+      if (gp0.buttons[3]?.pressed) startGame();
+      if (gp0.buttons[2]?.pressed) window.location.href = 'index.html';
+    }
+  }
+
+  if (gp1) {
+    if (gameState === 'menu') {
+      if (gp1.buttons[8]?.pressed) selectPlayers(1);
+      if (gp1.buttons[9]?.pressed) selectPlayers(2);
+    }
+
+    if (gameState === 'playing' && selectedPlayers === 2) {
+      Object.entries(GAMEPAD_P2).forEach(([btn, lane]) => {
+        const pressed = gp1.buttons[btn]?.pressed;
+        if (pressed && !lastButtons.p2[btn]) {
+          registerHit(1, lane);
+        }
+        lastButtons.p2[btn] = pressed;
+      });
+    }
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (gameState === 'menu') {
+    if (e.code === 'ArrowLeft') selectPlayers(1);
+    if (e.code === 'ArrowRight') selectPlayers(2);
+    if (e.code === 'Enter' || e.code === 'Space') {
+      e.preventDefault();
+      startGame();
+    }
+  } else if (gameState === 'playing') {
+    if (KEY_MAP[e.code] !== undefined) {
+      registerHit(0, KEY_MAP[e.code]);
+    }
+  } else if (gameState === 'results') {
+    if (e.code === 'Enter' || e.code === 'Space') {
+      e.preventDefault();
+      startGame();
+    }
+  }
+
+  if (e.code === 'Escape') {
+    window.location.href = 'index.html';
+  }
+});
+
+function gameLoop() {
+  handleGamepad();
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+showMenu();
+gameLoop();
+</script>
+
+</body>
+</html>
