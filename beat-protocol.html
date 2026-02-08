@@ -60,37 +60,38 @@ canvas{
   background:rgba(0,0,0,0.85);
   border-radius:12px;
   text-align:center;
-  padding:30px;
+  padding:25px 30px;
+  box-sizing:border-box;
 }
 .title{
-  font-size:60px;
+  font-size:52px;
   font-weight:bold;
   color:#00F5FF;
   text-shadow:0 0 30px #00F5FF, 0 0 60px #9D4EDD;
-  margin-bottom:10px;
+  margin-bottom:8px;
   text-transform:uppercase;
 }
 .subtitle{
-  font-size:22px;
+  font-size:20px;
   color:#FF006E;
-  margin-bottom:25px;
+  margin-bottom:12px;
 }
 .instructions{
   color:#fff;
-  font-size:16px;
-  line-height:1.8;
-  margin-bottom:20px;
+  font-size:15px;
+  line-height:1.5;
+  margin-bottom:12px;
 }
 .player-select{
   display:flex;
   gap:20px;
-  margin-bottom:20px;
+  margin-bottom:14px;
 }
 .player-option{
-  padding:14px 28px;
+  padding:12px 24px;
   border:3px solid #9D4EDD;
   border-radius:10px;
-  font-size:22px;
+  font-size:20px;
   color:#fff;
   cursor:pointer;
   background:rgba(157,78,221,0.2);
@@ -103,17 +104,17 @@ canvas{
   transform:scale(1.05);
 }
 .startBtn{
-  padding:14px 30px;
+  padding:12px 28px;
   background:#FF006E;
   color:#fff;
   border:none;
   border-radius:10px;
-  font-size:20px;
+  font-size:18px;
   font-weight:bold;
   cursor:pointer;
   box-shadow:0 0 20px rgba(255,0,110,0.7);
   animation:pulse 2s ease-in-out infinite;
-  margin-bottom:10px;
+  margin-bottom:6px;
 }
 @keyframes pulse{
   0%,100%{transform:scale(1);}
@@ -122,6 +123,64 @@ canvas{
 .controls-hint{
   color:#9D4EDD;
   font-size:14px;
+}
+.song-selector{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:15px;
+  margin:15px 0 14px 0;
+}
+.song-card{
+  padding:16px 26px;
+  border:3px solid #9D4EDD;
+  border-radius:12px;
+  background:rgba(157,78,221,0.15);
+  box-shadow:0 0 20px rgba(157,78,221,0.3);
+  min-width:380px;
+  transition:all 0.3s ease;
+}
+.song-card.selected{
+  border-color:#FFD700;
+  background:rgba(255,215,0,0.2);
+  box-shadow:0 0 30px rgba(255,215,0,0.6);
+  transform:scale(1.03);
+}
+.song-card-title{
+  font-size:24px;
+  font-weight:bold;
+  color:#00F5FF;
+  margin-bottom:6px;
+  text-shadow:0 0 15px #00F5FF;
+}
+.song-card-artist{
+  font-size:15px;
+  color:#FF006E;
+  margin-bottom:8px;
+}
+.song-card-info{
+  font-size:13px;
+  color:#9D4EDD;
+  display:flex;
+  justify-content:space-around;
+  gap:12px;
+}
+.song-nav-arrow{
+  font-size:40px;
+  color:#FFD700;
+  text-shadow:0 0 20px #FFD700;
+  cursor:pointer;
+  user-select:none;
+  transition:all 0.2s ease;
+  animation:arrowPulse 2s ease-in-out infinite;
+}
+.song-nav-arrow:hover{
+  transform:scale(1.2);
+  text-shadow:0 0 30px #FFD700;
+}
+@keyframes arrowPulse{
+  0%,100%{opacity:0.7;}
+  50%{opacity:1;}
 }
 .scanlines{
   position:fixed;
@@ -151,8 +210,8 @@ canvas{
   </div>
   <div style="position:relative;">
     <canvas id="canvas" width="900" height="600" style="position:relative;z-index:1;"></canvas>
-    <video id="bgVideo" style="position:absolute;top:0;left:0;width:900px;height:600px;object-fit:cover;opacity:0;border-radius:12px;pointer-events:none;z-index:2;filter:hue-rotate(290deg) saturate(1.3) brightness(0.9) contrast(1.1);mix-blend-mode:screen;" muted loop>
-      <source src="assets/bad-apple.mp4" type="video/mp4">
+    <video id="bgVideo" style="position:absolute;top:6px;left:6px;width:888px;height:588px;object-fit:cover;opacity:0;border-radius:6px;pointer-events:none;z-index:2;filter:hue-rotate(290deg) saturate(1.3) brightness(0.9) contrast(1.1);mix-blend-mode:screen;" muted>
+      <source id="videoSource" src="" type="video/mp4">
     </video>
     <div id="overlay" style="z-index:3;"></div>
   </div>
@@ -190,9 +249,22 @@ const SONGS = {
     bpm: 138,
     duration: 120000,
     difficulty: 'Medium',
+    videoPath: 'assets/songs/bad-apple/video.mp4',
+    notes: []
+  },
+  'echo': {
+    title: 'ECHO',
+    artist: 'Crusher-P feat. GUMI',
+    bpm: 140,
+    duration: 239000,
+    difficulty: 'Hard',
+    videoPath: 'assets/songs/echo/video.mp4',
     notes: []
   }
 };
+
+const SONG_KEYS = Object.keys(SONGS);
+let selectedSongIndex = 0;
 
 function generateBadAppleNotes() {
   const song = SONGS['bad-apple'];
@@ -240,6 +312,138 @@ function generateBadAppleNotes() {
 }
 
 generateBadAppleNotes();
+
+function generateEchoNotes() {
+  const song = SONGS['echo'];
+  const beatMs = 60000 / song.bpm; // ~428ms per beat at 140 BPM
+  const totalBeats = Math.floor(song.duration / beatMs); // ~559 beats
+  const notes = [];
+  
+  const startOffset = 2000; // 2 second intro
+  
+  // ECHO patterns - more complex than Bad Apple
+  const introPattern = [0, 1, 2]; // Sparse intro
+  const versePattern = [0, 1, 2, 3, 1, 2, 0, 3]; // Melodic verse
+  const preChorusPattern = [2, 3, 4, 3, 2, 1, 4, 5]; // Building intensity
+  const chorusPattern = [0, 2, 4, 1, 3, 5, 2, 4]; // All lanes chorus
+  const bridgePattern = [5, 4, 3, 2, 1, 0]; // Descending technical
+  const fillPattern = [4, 5, 4, 5]; // Action button accents
+
+  for (let i = 0; i < totalBeats; i++) {
+    const time = startOffset + i * beatMs;
+    const bar = Math.floor(i / 8);
+    const beatInBar = i % 8;
+    const beatInPhrase = i % 16;
+    
+    // Determine song section based on time
+    const secondsIn = time / 1000;
+    let section = 'intro';
+    if (secondsIn < 15) section = 'intro';
+    else if (secondsIn < 45) section = 'verse1';
+    else if (secondsIn < 60) section = 'prechorus1';
+    else if (secondsIn < 90) section = 'chorus1';
+    else if (secondsIn < 120) section = 'verse2';
+    else if (secondsIn < 150) section = 'prechorus2';
+    else if (secondsIn < 180) section = 'chorus2';
+    else if (secondsIn < 210) section = 'bridge';
+    else section = 'outro';
+    
+    // Intro (0:00-0:15) - Sparse melodic notes
+    if (section === 'intro') {
+      if (beatInBar === 0 || beatInBar === 4) {
+        const lane = introPattern[beatInBar % introPattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+    
+    // Verse 1 (0:15-0:45) - Steady rhythm
+    else if (section === 'verse1') {
+      if (beatInBar % 2 === 0) {
+        const lane = versePattern[beatInBar];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+      // Add fills on every 4th bar
+      if (bar % 4 === 3 && (beatInBar === 6 || beatInBar === 7)) {
+        const lane = fillPattern[beatInBar % fillPattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+    
+    // Pre-Chorus (0:45-1:00, 2:00-2:30) - Building intensity
+    else if (section === 'prechorus1' || section === 'prechorus2') {
+      if (beatInBar === 0 || beatInBar === 2 || beatInBar === 4 || beatInBar === 6) {
+        const lane = preChorusPattern[beatInBar];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+      // 8th note fills
+      if (beatInBar === 7) {
+        notes.push({ time, lane: 4, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+        notes.push({ time: time + beatMs / 2, lane: 5, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+    
+    // Chorus (1:00-1:30, 2:30-3:00) - Dense patterns, all lanes
+    else if (section === 'chorus1' || section === 'chorus2') {
+      // Main beat notes
+      if (beatInBar % 2 === 0) {
+        const lane = chorusPattern[beatInBar];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+      // Off-beat notes for intensity
+      if (beatInPhrase === 3 || beatInPhrase === 7 || beatInPhrase === 11 || beatInPhrase === 15) {
+        const lane = fillPattern[beatInBar % fillPattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+      // Chord hits on strong beats
+      if (bar % 4 === 0 && beatInBar === 0) {
+        notes.push({ time, lane: 0, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+        notes.push({ time: time + 50, lane: 2, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+        notes.push({ time: time + 100, lane: 4, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+    
+    // Verse 2 (1:30-2:00) - Melodic with more variation
+    else if (section === 'verse2') {
+      if (beatInBar === 0 || beatInBar === 2 || beatInBar === 4 || beatInBar === 6) {
+        const lane = versePattern[beatInBar];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+      if (beatInBar === 1 || beatInBar === 5) {
+        const lane = fillPattern[beatInBar % fillPattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+    
+    // Bridge (3:00-3:30) - Technical sequences
+    else if (section === 'bridge') {
+      // Rapid lane switching
+      if (beatInBar % 2 === 0) {
+        const lane = bridgePattern[beatInBar % bridgePattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+      // 16th note runs on every other bar
+      if (bar % 2 === 1 && beatInBar === 7) {
+        for (let j = 0; j < 4; j++) {
+          const lane = j % 6;
+          notes.push({ time: time + j * (beatMs / 4), lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+        }
+      }
+    }
+    
+    // Outro (3:30-3:59) - Decreasing intensity
+    else if (section === 'outro') {
+      if (beatInBar === 0 || beatInBar === 4) {
+        const lane = introPattern[beatInBar % introPattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+  }
+
+  notes.sort((a, b) => a.time - b.time);
+  song.notes = notes;
+}
+
+generateEchoNotes();
 
 let gameState = 'menu';
 let selectedPlayers = 1;
@@ -313,11 +517,62 @@ function resetStats() {
   });
 }
 
+function selectSong(direction) {
+  selectedSongIndex = (selectedSongIndex + direction + SONG_KEYS.length) % SONG_KEYS.length;
+  currentSongKey = SONG_KEYS[selectedSongIndex];
+  updateSongDisplay();
+  showMenu();
+}
+
+function updateSongDisplay() {
+  const song = SONGS[currentSongKey];
+  document.getElementById('songTitle').textContent = song.title.toUpperCase();
+  
+  // Update video source
+  const videoSource = document.getElementById('videoSource');
+  if (videoSource) {
+    videoSource.src = song.videoPath;
+    const bgVideo = document.getElementById('bgVideo');
+    if (bgVideo) {
+      bgVideo.load();
+    }
+  }
+}
+
 function showMenu() {
   gameState = 'menu';
+  const song = SONGS[currentSongKey];
+  const showArrows = SONG_KEYS.length > 1;
+  
   overlay.innerHTML = `
     <div class="title">BEAT PROTOCOL</div>
-    <div class="subtitle">Rhythm Warfare • ${SONGS[currentSongKey].title}</div>
+    
+    ${showArrows ? `
+    <div class="song-selector">
+      <div class="song-nav-arrow" onclick="selectSong(-1)">◄</div>
+      <div class="song-card selected">
+        <div class="song-card-title">${song.title}</div>
+        <div class="song-card-artist">${song.artist}</div>
+        <div class="song-card-info">
+          <span>BPM: ${song.bpm}</span>
+          <span>Difficulty: ${song.difficulty}</span>
+          <span>Duration: ${Math.floor(song.duration / 60000)}:${String(Math.floor((song.duration % 60000) / 1000)).padStart(2, '0')}</span>
+        </div>
+      </div>
+      <div class="song-nav-arrow" onclick="selectSong(1)">►</div>
+    </div>
+    ` : `
+    <div class="song-card selected" style="margin:25px 0;">
+      <div class="song-card-title">${song.title}</div>
+      <div class="song-card-artist">${song.artist}</div>
+      <div class="song-card-info">
+        <span>BPM: ${song.bpm}</span>
+        <span>Difficulty: ${song.difficulty}</span>
+        <span>Duration: ${Math.floor(song.duration / 60000)}:${String(Math.floor((song.duration % 60000) / 1000)).padStart(2, '0')}</span>
+      </div>
+    </div>
+    `}
+    
     <div class="instructions">
       <strong>6-LANE ARCADE RHYTHM COMBAT</strong><br>
       Hit notes when they cross the sync line.<br>
@@ -335,11 +590,12 @@ function showMenu() {
       START: Begin • COIN: Return to Menu
     </div>
     <div class="startBtn" onclick="startGame()">PRESS START</div>
-    <div class="controls-hint">Use 1P/2P SELECT or Arrow Keys to choose players</div>
+    <div class="controls-hint">Use UP/DOWN or Arrow Keys to select song • 1P/2P SELECT for players</div>
   `;
   overlay.style.display = 'flex';
   document.getElementById('modeLabel').textContent = selectedPlayers === 2 ? '2P' : '1P';
   document.getElementById('p2Panel').style.display = selectedPlayers === 2 ? 'block' : 'none';
+  updateSongDisplay();
 }
 
 function selectPlayers(count) {
@@ -751,8 +1007,14 @@ function handleGamepad() {
 
   if (gp0) {
     if (gameState === 'menu') {
-      if (gp0.buttons[3]?.pressed) startGame();
-      if (gp0.buttons[2]?.pressed) window.location.href = 'index.html';
+      if (gp0.buttons[3]?.pressed && !lastButtons.p1[3]) startGame();
+      if (gp0.buttons[2]?.pressed && !lastButtons.p1[2]) window.location.href = 'index.html';
+      if (gp0.buttons[7]?.pressed && !lastButtons.p1[7]) selectSong(-1); // UP
+      if (gp0.buttons[4]?.pressed && !lastButtons.p1[4]) selectSong(1);  // DOWN
+      lastButtons.p1[3] = gp0.buttons[3]?.pressed || false;
+      lastButtons.p1[2] = gp0.buttons[2]?.pressed || false;
+      lastButtons.p1[7] = gp0.buttons[7]?.pressed || false;
+      lastButtons.p1[4] = gp0.buttons[4]?.pressed || false;
     }
 
     if (gameState === 'playing') {
@@ -791,6 +1053,14 @@ function handleGamepad() {
 
 document.addEventListener('keydown', (e) => {
   if (gameState === 'menu') {
+    if (e.code === 'ArrowUp') {
+      e.preventDefault();
+      selectSong(-1);
+    }
+    if (e.code === 'ArrowDown') {
+      e.preventDefault();
+      selectSong(1);
+    }
     if (e.code === 'ArrowLeft') selectPlayers(1);
     if (e.code === 'ArrowRight') selectPlayers(2);
     if (e.code === 'Enter' || e.code === 'Space') {
