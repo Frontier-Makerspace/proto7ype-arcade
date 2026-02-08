@@ -243,6 +243,15 @@ const LANE_COLORS = ['#FF6EC7', '#B794F6', '#F687B3', '#FBD38D', '#81E6D9', '#D6
 const LANE_COLORS_DARK = ['#D946A6', '#9F7AEA', '#ED64A6', '#F6AD55', '#4FD1C5', '#B794F6'];
 
 const SONGS = {
+  'moonlight': {
+    title: 'Moonlight',
+    artist: 'XXXTentacion',
+    bpm: 152,
+    duration: 137000,
+    difficulty: 'Easy',
+    videoPath: 'assets/songs/moonlight/video.mp4',
+    notes: []
+  },
   'bad-apple': {
     title: 'Bad Apple!!',
     artist: 'Touhou (Arcade Remix)',
@@ -444,6 +453,58 @@ function generateEchoNotes() {
 }
 
 generateEchoNotes();
+
+function generateMoonlightNotes() {
+  const song = SONGS['moonlight'];
+  const beatMs = 60000 / song.bpm; // ~395ms per beat at 152 BPM
+  const totalBeats = Math.floor(song.duration / beatMs); // ~348 beats
+  const notes = [];
+  
+  const startOffset = 1500; // 1.5 second intro
+  
+  // Moonlight patterns - atmospheric and sparse (easier than other songs)
+  const melodyPattern = [0, 1, 2, 1]; // Simple melodic progression
+  const bassPattern = [0, 3]; // Low notes for downbeats
+  const accentPattern = [4, 5]; // Occasional accents on action buttons
+  
+  for (let i = 0; i < totalBeats; i++) {
+    const time = startOffset + i * beatMs;
+    const bar = Math.floor(i / 8);
+    const beatInBar = i % 8;
+    const section = Math.floor(bar / 8) % 4;
+    
+    // Main downbeats - on every 1 and 3
+    if (beatInBar === 0 || beatInBar === 4) {
+      const lane = bassPattern[beatInBar === 0 ? 0 : 1];
+      notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+    }
+    
+    // Melody notes - sparse, on 2 and 4
+    if (section >= 1 && (beatInBar === 2 || beatInBar === 6)) {
+      const lane = melodyPattern[(beatInBar / 2) % melodyPattern.length];
+      notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+    }
+    
+    // Add some variation every 4 bars
+    if (section >= 2 && bar % 4 === 3 && beatInBar === 7) {
+      const lane = accentPattern[bar % accentPattern.length];
+      notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+    }
+    
+    // Chorus/hook sections - slightly more dense
+    if (section === 2 || section === 3) {
+      if (beatInBar === 1 || beatInBar === 5) {
+        const lane = melodyPattern[(beatInBar - 1) / 4 % melodyPattern.length];
+        notes.push({ time, lane, hitP1: false, hitP2: false, missedP1: false, missedP2: false });
+      }
+    }
+  }
+
+  notes.sort((a, b) => a.time - b.time);
+  song.notes = notes;
+}
+
+generateMoonlightNotes();
 
 let gameState = 'menu';
 let selectedPlayers = 1;
