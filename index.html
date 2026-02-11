@@ -186,6 +186,42 @@ html,body{
   box-shadow:0 0 30px rgba(255,0,255,0.6);
 }
 
+/* Special Dread cartridge styling */
+.cartridge-dread{
+  background:linear-gradient(135deg,#0A0000 0%,#1A0000 50%,#8B0000 100%);
+  border-color:#660000;
+  animation:bloodPulse 3s ease-in-out infinite;
+  box-shadow:0 0 20px rgba(139,0,0,0.5);
+}
+@keyframes bloodPulse{
+  0%,100%{border-color:#660000;box-shadow:0 0 20px rgba(139,0,0,0.5);}
+  50%{border-color:#8B0000;box-shadow:0 0 40px rgba(255,0,0,0.7);}
+}
+
+.cartridge-dread .cartridge-label{
+  color:#8B0000;
+  text-shadow:0 0 10px #FF0000,0 0 20px #660000;
+  font-weight:900;
+}
+
+.cartridge-dread.selected{
+  border-color:#FF0000;
+  border-width:5px;
+  box-shadow:0 0 50px rgba(255,0,0,0.8),inset 0 0 40px rgba(139,0,0,0.3);
+  transform:translateX(25px);
+  background:linear-gradient(135deg,#1A0000 0%,#330000 50%,#8B0000 100%);
+}
+
+.cartridge-dread.selected .cartridge-label{
+  color:#FF0000;
+  text-shadow:0 0 20px #FF0000,0 0 40px #8B0000;
+}
+
+.cartridge-dread:hover:not(.selected){
+  border-color:#8B0000;
+  box-shadow:0 0 30px rgba(255,0,0,0.6);
+}
+
 .crt-container{
   flex:1;
   display:flex;flex-direction:column;
@@ -389,6 +425,10 @@ html,body{
       <div class="cartridge-label">BEAT PROTOCOL</div>
       <span class="player-badge">2P</span>
     </div>
+    <div class="cartridge cartridge-dread" data-game="8">
+      <span class="cart-icon">💀</span>
+      <div class="cartridge-label">DREAD</div>
+    </div>
   </div>
 
   <div class="crt-container">
@@ -471,6 +511,16 @@ html,body{
           </div>
           <div class="preview-multiplayer">⚡ 2-PLAYER MODE AVAILABLE ⚡</div>
         </div>
+
+        <div class="game-preview" id="preview8">
+          <div class="preview-icon" style="color:#8B0000">💀</div>
+          <div class="preview-title" style="color:#FF0000;text-shadow:0 0 40px #FF0000;">DREAD</div>
+          <div class="preview-desc" style="color:#999;">
+            First-person survival horror! Navigate dark corridors with limited flashlight battery.
+            Avoid bloodthirsty monsters that grow faster each wave.
+            <span style="color:#FF0000;font-weight:bold;">No weapons. Only survival.</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -482,7 +532,7 @@ html,body{
 
 <script>
 let selectedGame = 0;
-const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html', 'cline-defenders.html', 'beat-protocol.html'];
+const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html', 'cline-defenders.html', 'beat-protocol.html', 'dread.html'];
 const cartridges = document.querySelectorAll('.cartridge');
 const previews = document.querySelectorAll('.game-preview');
 

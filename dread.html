@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>DREAD - Survival Horror</title>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background: linear-gradient(to bottom, #0A0000, #1A0000);
+  overflow:hidden;
+  font-family: 'Courier New', monospace;
+}
+#gameContainer{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:20px;
+}
+#hud{
+  display:flex;
+  gap:40px;
+  margin-bottom:20px;
+  font-size:18px;
+  font-weight:bold;
+}
+.health{
+  color:#FF0000;
+  text-shadow: 0 0 10px #FF0000;
+}
+.battery{
+  color:#FFAA00;
+  text-shadow: 0 0 10px #FFAA00;
+}
+.score{
+  color:#8B0000;
+  text-shadow: 0 0 10px #8B0000;
+}
+.wave{
+  color:#660000;
+  text-shadow: 0 0 10px #660000;
+}
+canvas{
+  border:4px solid #8B0000;
+  border-radius:8px;
+  box-shadow: 0 0 30px #8B0000, inset 0 0 20px rgba(139,0,0,0.3);
+  background:#000;
+}
+#overlay{
+  position:absolute;
+  top:0;
+  left:0;
+  width:900px;
+  height:600px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:rgba(10,0,0,0.95);
+  border-radius:8px;
+  text-align:center;
+}
+.title{
+  font-size:72px;
+  color:#8B0000;
+  text-shadow: 0 0 40px #FF0000, 0 0 80px #8B0000, 3px 3px 0px #000;
+  margin-bottom:20px;
+  text-transform:uppercase;
+  animation: bloodDrip 3s ease-in-out infinite, flicker 0.5s infinite;
+  font-weight:900;
+  letter-spacing:8px;
+}
+@keyframes bloodDrip{
+  0%,100%{transform:translateY(0px);}
+  50%{transform:translateY(3px);}
+}
+@keyframes flicker{
+  0%,100%{opacity:1;}
+  50%{opacity:0.95;}
+}
+.subtitle{
+  font-size:20px;
+  color:#FF0000;
+  margin-bottom:30px;
+  text-shadow: 0 0 20px #FF0000;
+}
+.instructions{
+  color:#888;
+  font-size:16px;
+  line-height:2;
+  margin-bottom:30px;
+  background:rgba(0,0,0,0.5);
+  padding:20px;
+  border-radius:8px;
+  border:2px solid #330000;
+}
+.instructions strong{
+  color:#FF0000;
+}
+.startBtn{
+  padding:18px 40px;
+  background:#8B0000;
+  color:#fff;
+  border:3px solid #FF0000;
+  border-radius:8px;
+  font-size:24px;
+  font-weight:bold;
+  cursor:pointer;
+  box-shadow: 0 0 30px #8B0000;
+  animation: pulse 2s infinite;
+  text-transform:uppercase;
+  letter-spacing:2px;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1); box-shadow: 0 0 30px #8B0000;}
+  50%{transform:scale(1.05); box-shadow: 0 0 50px #FF0000;}
+}
+.startBtn:hover{
+  background:#A00000;
+  border-color:#FF3333;
+}
+.scanline{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.2),
+    rgba(0,0,0,0.2) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+  z-index:1000;
+  animation: scanMove 8s linear infinite;
+}
+@keyframes scanMove{
+  0%{transform:translateY(0);}
+  100%{transform:translateY(20px);}
+}
+.glitch{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  pointer-events:none;
+  z-index:999;
+  opacity:0;
+  animation: glitchAnim 5s infinite;
+}
+@keyframes glitchAnim{
+  0%,100%{opacity:0;}
+  2%{opacity:0.3; background:rgba(139,0,0,0.1);}
+  4%{opacity:0;}
+}
+#flashlightIndicator{
+  position:absolute;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:16px;
+  color:#FFAA00;
+  text-shadow: 0 0 15px #FFAA00;
+  padding:10px 20px;
+  background:rgba(0,0,0,0.8);
+  border:2px solid #FFAA00;
+  border-radius:6px;
+}
+.controls-hint{
+  color:#666;
+  font-size:14px;
+  margin-top:15px;
+}
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+<div class="glitch"></div>
+
+<div id="gameContainer">
+  <div id="hud">
+    <div class="health">HEALTH: <span id="health">100</span>%</div>
+    <div class="battery">BATTERY: <span id="battery">100</span>%</div>
+    <div class="score">DISTANCE: <span id="score">0</span>m</div>
+    <div class="wave">WAVE: <span id="wave">1</span></div>
+  </div>
+  <div style="position:relative;">
+    <canvas id="canvas" width="900" height="600"></canvas>
+    <div id="flashlightIndicator" style="display:none;">
+      💡 FLASHLIGHT: <span id="flashState">OFF</span>
+    </div>
+    <div id="overlay">
+      <div class="title">D R E A D</div>
+      <div class="subtitle">🩸 SURVIVE THE DARKNESS 🩸</div>
+      <div class="instructions">
+        <strong>CONTROLS:</strong><br>
+        Joystick Left/Right: Turn<br>
+        Joystick Up/Down: Move Forward/Backward<br>
+        BTN 7 (Shoot): Toggle Flashlight<br>
+        BTN 6: Interact (Pick up items)<br>
+        <br>
+        <strong style="color:#FFAA00;">⚠ WARNING ⚠</strong><br>
+        Your flashlight reveals monsters in the dark.<br>
+        Battery drains while ON. Find batteries to survive.<br>
+        Monsters grow faster and more aggressive each wave.<br>
+        <strong style="color:#FF0000;">There are no weapons. Only survival.</strong>
+      </div>
+      <div class="startBtn" onclick="startGame()">PRESS START</div>
+      <div class="controls-hint">Press COIN to return to menu</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+// Constants
+const GAME_WIDTH = 900;
+const GAME_HEIGHT = 600;
+const FOV = Math.PI / 3; // 60 degrees
+const HALF_FOV = FOV / 2;
+const NUM_RAYS = 300;
+const MAX_DEPTH = 20;
+const TILE_SIZE = 1;
+
+const COLORS = {
+  darkRed: '#8B0000',
+  red: '#FF0000',
+  blood: '#660000',
+  black: '#000000',
+  orange: '#FFAA00',
+  darkGray: '#1A1A1A',
+  gray: '#333333',
+};
+
+// Game state
+let gameState = 'menu';
+let health = 100;
+let battery = 100;
+let flashlightOn = false;
+let score = 0;
+let wave = 1;
+let highScore = localStorage.getItem('dreadHighScore') || 0;
+let frameCount = 0;
+
+// Player
+let player = {
+  x: 8,
+  y: 8,
+  angle: 0,
+  speed: 0.05,
+  rotSpeed: 0.03
+};
+
+// Map (1 = wall, 0 = empty)
+let map = [];
+const MAP_SIZE = 20;
+
+// Monsters
+let monsters = [];
+let pickups = [];
+
+// Input
+const input = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false,
+  flashlight: false,
+  flashlightPressed: false,
+  interact: false,
+  interactPressed: false
+};
+
+// Generate maze
+function generateMap() {
+  map = [];
+  for (let y = 0; y < MAP_SIZE; y++) {
+    map[y] = [];
+    for (let x = 0; x < MAP_SIZE; x++) {
+      // Border walls
+      if (x === 0 || x === MAP_SIZE - 1 || y === 0 || y === MAP_SIZE - 1) {
+        map[y][x] = 1;
+      } else {
+        // Create maze-like structure
+        map[y][x] = (Math.random() < 0.25) ? 1 : 0;
+      }
+    }
+  }
+  
+  // Clear starting area
+  for (let y = 7; y < 10; y++) {
+    for (let x = 7; x < 10; x++) {
+      map[y][x] = 0;
+    }
+  }
+  
+  // Ensure some corridors
+  for (let i = 0; i < 30; i++) {
+    const x = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+    const y = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+    map[y][x] = 0;
+  }
+}
+
+// Monster class
+class Monster {
+  constructor(x, y, wave) {
+    this.x = x;
+    this.y = y;
+    this.baseSpeed = 0.01 + (wave * 0.005);
+    this.speed = this.baseSpeed;
+    this.size = 0.3;
+    this.health = 1;
+    this.active = true;
+    this.damage = 5 + (wave * 2);
+    this.lastAttackTime = 0;
+    this.attackCooldown = 60;
+    this.color = wave < 3 ? '#660000' : wave < 5 ? '#8B0000' : '#FF0000';
+    this.canSprint = wave >= 5;
+    this.sprintChance = 0.02;
+    this.isSprinting = false;
+  }
+
+  update() {
+    // Distance to player
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 0.5) {
+      // Attack player
+      if (frameCount - this.lastAttackTime > this.attackCooldown) {
+        health -= this.damage;
+        updateHealth();
+        this.lastAttackTime = frameCount;
+        
+        // Screen shake effect
+        canvas.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
+        setTimeout(() => canvas.style.transform = '', 100);
+      }
+    } else {
+      // Move toward player
+      const moveX = (dx / dist) * this.speed;
+      const moveY = (dy / dist) * this.speed;
+      
+      const newX = this.x + moveX;
+      const newY = this.y + moveY;
+      
+      // Check collision with walls
+      if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+        this.x = newX;
+        this.y = newY;
+      }
+      
+      // Sprint behavior for late-game monsters
+      if (this.canSprint) {
+        if (!this.isSprinting && Math.random() < this.sprintChance) {
+          this.isSprinting = true;
+          this.speed = this.baseSpeed * 3;
+          setTimeout(() => {
+            this.isSprinting = false;
+            this.speed = this.baseSpeed;
+          }, 2000);
+        }
+      }
+    }
+  }
+
+  getDistanceToPlayer() {
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+}
+
+// Pickup class
+class Pickup {
+  constructor(x, y, type) {
+    this.x = x;
+    this.y = y;
+    this.type = type; // 'battery' or 'health'
+    this.active = true;
+    this.size = 0.2;
+  }
+}
+
+// Spawn monsters
+function spawnMonsters() {
+  monsters = [];
+  const count = 2 + wave;
+  
+  for (let i = 0; i < count; i++) {
+    let x, y;
+    let attempts = 0;
+    do {
+      x = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+      y = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+      attempts++;
+    } while ((map[y][x] === 1 || (Math.abs(x - player.x) < 5 && Math.abs(y - player.y) < 5)) && attempts < 50);
+    
+    if (map[y][x] === 0) {
+      monsters.push(new Monster(x, y, wave));
+    }
+  }
+}
+
+// Spawn pickups
+function spawnPickups() {
+  pickups = [];
+  const count = 3 + Math.floor(wave / 2);
+  
+  for (let i = 0; i < count; i++) {
+    let x, y;
+    let attempts = 0;
+    do {
+      x = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+      y = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+      attempts++;
+    } while ((map[y][x] === 1 || (Math.abs(x - player.x) < 3 && Math.abs(y - player.y) < 3)) && attempts < 50);
+    
+    if (map[y][x] === 0) {
+      const type = Math.random() < 0.6 ? 'battery' : 'health';
+      pickups.push(new Pickup(x, y, type));
+    }
+  }
+}
+
+// Raycasting
+function castRay(angle) {
+  const rayDirX = Math.cos(angle);
+  const rayDirY = Math.sin(angle);
+  
+  let dist = 0;
+  let hitWall = false;
+  
+  while (!hitWall && dist < MAX_DEPTH) {
+    dist += 0.05;
+    
+    const testX = player.x + rayDirX * dist;
+    const testY = player.y + rayDirY * dist;
+    
+    const mapX = Math.floor(testX);
+    const mapY = Math.floor(testY);
+    
+    if (mapX < 0 || mapX >= MAP_SIZE || mapY < 0 || mapY >= MAP_SIZE) {
+      hitWall = true;
+      dist = MAX_DEPTH;
+    } else if (map[mapY][mapX] === 1) {
+      hitWall = true;
+    }
+  }
+  
+  return dist;
+}
+
+// Draw 3D view
+function draw3DView() {
+  const rayAngleStep = FOV / NUM_RAYS;
+  
+  for (let i = 0; i < NUM_RAYS; i++) {
+    const rayAngle = player.angle - HALF_FOV + (i * rayAngleStep);
+    const distance = castRay(rayAngle);
+    
+    // Calculate wall height
+    const correctedDist = distance * Math.cos(rayAngle - player.angle);
+    const wallHeight = correctedDist === 0 ? GAME_HEIGHT : (GAME_HEIGHT / correctedDist) * 0.5;
+    
+    const x = (i / NUM_RAYS) * GAME_WIDTH;
+    const wallTop = (GAME_HEIGHT - wallHeight) / 2;
+    
+    // Sky/ceiling
+    ctx.fillStyle = COLORS.black;
+    ctx.fillRect(x, 0, GAME_WIDTH / NUM_RAYS + 1, wallTop);
+    
+    // Wall color based on distance (darker = farther)
+    let brightness = Math.max(0, 1 - (distance / MAX_DEPTH));
+    if (!flashlightOn) {
+      brightness *= 0.1; // Very dark without flashlight
+    }
+    
+    const wallColor = `rgb(${Math.floor(139 * brightness)}, 0, 0)`;
+    ctx.fillStyle = wallColor;
+    ctx.fillRect(x, wallTop, GAME_WIDTH / NUM_RAYS + 1, wallHeight);
+    
+    // Floor
+    ctx.fillStyle = COLORS.black;
+    ctx.fillRect(x, wallTop + wallHeight, GAME_WIDTH / NUM_RAYS + 1, GAME_HEIGHT);
+  }
+}
+
+// Draw monsters (sprites) - SCARY VERSION
+function drawMonsters() {
+  // Sort monsters by distance (far to near)
+  const sortedMonsters = monsters.filter(m => m.active).sort((a, b) => {
+    return b.getDistanceToPlayer() - a.getDistanceToPlayer();
+  });
+  
+  sortedMonsters.forEach(monster => {
+    const dx = monster.x - player.x;
+    const dy = monster.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Only draw if close enough and (flashlight on OR very close)
+    const visibilityThreshold = flashlightOn ? 8 : 1.5;
+    if (dist > visibilityThreshold) return;
+    
+    // Angle to monster
+    const angleToMonster = Math.atan2(dy, dx);
+    let relativeAngle = angleToMonster - player.angle;
+    
+    // Normalize angle
+    while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
+    while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
+    
+    // Check if in FOV
+    if (Math.abs(relativeAngle) > HALF_FOV + 0.2) return;
+    
+    // Project to screen
+    const screenX = (relativeAngle / FOV + 0.5) * GAME_WIDTH;
+    const spriteHeight = (GAME_HEIGHT / dist) * 0.6;
+    const spriteWidth = spriteHeight * 0.8;
+    const spriteY = GAME_HEIGHT / 2 - spriteHeight / 2;
+    
+    // Brightness based on distance and flashlight
+    let brightness = Math.max(0, 1 - (dist / visibilityThreshold));
+    if (!flashlightOn) {
+      brightness *= 0.3;
+    }
+    
+    // Detail level based on distance
+    const detailLevel = Math.max(0, 1 - (dist / 5));
+    
+    // Breathing animation
+    const breathe = Math.sin(frameCount * 0.05 + monster.x * 10) * 0.03 + 1;
+    
+    // Base color with more variety
+    const baseRed = Math.floor(120 * brightness);
+    const baseGreen = Math.floor(10 * brightness);
+    const baseColor = `rgba(${baseRed}, ${baseGreen}, 0, ${brightness * 0.9})`;
+    
+    ctx.save();
+    
+    // Add scratchy texture overlay
+    if (detailLevel > 0.3) {
+      ctx.globalAlpha = brightness * 0.15;
+      for (let i = 0; i < 30 * detailLevel; i++) {
+        const tx = screenX + (Math.random() - 0.5) * spriteWidth * 0.6;
+        const ty = spriteY + Math.random() * spriteHeight * 0.5;
+        const tlen = Math.random() * 4 + 2;
+        const tangle = Math.random() * Math.PI;
+        
+        ctx.strokeStyle = `rgba(${baseRed}, 0, 0, ${brightness})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(tx + Math.cos(tangle) * tlen, ty + Math.sin(tangle) * tlen);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    
+    // HEAD - larger and more angular
+    const headRadius = spriteWidth * 0.22 * breathe;
+    const headY = spriteY + spriteHeight * 0.18;
+    
+    // Head shadow/base
+    ctx.fillStyle = baseColor;
+    ctx.shadowBlur = 25 * brightness;
+    ctx.shadowColor = monster.color;
+    ctx.beginPath();
+    ctx.arc(screenX, headY, headRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // DEEP EYE SOCKETS - hollow and dark
+    const eyeSocketRadius = spriteWidth * 0.09;
+    const eyeY = headY - headRadius * 0.1;
+    const eyeSpacing = spriteWidth * 0.12;
+    
+    ctx.shadowBlur = 15 * brightness;
+    ctx.fillStyle = `rgba(0, 0, 0, ${brightness * 0.95})`;
+    
+    // Left eye socket
+    ctx.beginPath();
+    ctx.arc(screenX - eyeSpacing, eyeY, eyeSocketRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Right eye socket
+    ctx.beginPath();
+    ctx.arc(screenX + eyeSpacing, eyeY, eyeSocketRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // DETAILED EYES - concentric circles for creepy effect
+    if (detailLevel > 0.4) {
+      const eyeGlow = Math.sin(frameCount * 0.1 + monster.x) * 0.2 + 0.8;
+      ctx.shadowBlur = 20 * brightness * eyeGlow;
+      ctx.shadowColor = '#FF0000';
+      
+      // Draw spiral/concentric eye pattern
+      for (let eye = 0; eye < 2; eye++) {
+        const eyeX = screenX + (eye === 0 ? -eyeSpacing : eyeSpacing);
+        
+        // Outer iris
+        ctx.fillStyle = `rgba(80, 0, 0, ${brightness})`;
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeSocketRadius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Mid ring
+        ctx.fillStyle = `rgba(120, 0, 0, ${brightness})`;
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeSocketRadius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner pupil - dark center
+        ctx.fillStyle = `rgba(0, 0, 0, ${brightness})`;
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeSocketRadius * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Glowing center dot
+        ctx.fillStyle = `rgba(255, 0, 0, ${brightness * eyeGlow})`;
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, eyeSocketRadius * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // Simple glowing eyes for far away
+      ctx.fillStyle = `rgba(255, 0, 0, ${brightness})`;
+      ctx.shadowBlur = 15 * brightness;
+      ctx.beginPath();
+      ctx.arc(screenX - eyeSpacing, eyeY, eyeSocketRadius * 0.3, 0, Math.PI * 2);
+      ctx.arc(screenX + eyeSpacing, eyeY, eyeSocketRadius * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // MOUTH WITH TEETH - only visible when close
+    if (detailLevel > 0.5) {
+      const mouthY = headY + headRadius * 0.4;
+      const mouthWidth = spriteWidth * 0.25;
+      const mouthHeight = spriteHeight * 0.08;
+      
+      // Dark mouth opening
+      ctx.shadowBlur = 10 * brightness;
+      ctx.fillStyle = `rgba(0, 0, 0, ${brightness * 0.9})`;
+      ctx.beginPath();
+      ctx.ellipse(screenX, mouthY, mouthWidth, mouthHeight, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Teeth
+      const numTeeth = 8;
+      ctx.fillStyle = `rgba(${150 * brightness}, ${140 * brightness}, ${130 * brightness}, ${brightness})`;
+      for (let t = 0; t < numTeeth; t++) {
+        const toothX = screenX - mouthWidth + (mouthWidth * 2 / numTeeth) * t;
+        const toothWidth = mouthWidth * 2 / numTeeth * 0.6;
+        const toothHeight = mouthHeight * 0.8;
+        
+        ctx.beginPath();
+        ctx.moveTo(toothX, mouthY - mouthHeight * 0.3);
+        ctx.lineTo(toothX - toothWidth * 0.5, mouthY + mouthHeight * 0.5);
+        ctx.lineTo(toothX + toothWidth * 0.5, mouthY + mouthHeight * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    
+    // BODY - gaunt and textured
+    ctx.shadowBlur = 15 * brightness;
+    const bodyY = spriteY + spriteHeight * 0.4;
+    const bodyHeight = spriteHeight * 0.45;
+    const bodyWidth = spriteWidth * 0.25;
+    
+    // Body shadow
+    ctx.fillStyle = `rgba(${baseRed * 0.6}, 0, 0, ${brightness * 0.7})`;
+    ctx.fillRect(screenX - bodyWidth / 2, bodyY, bodyWidth, bodyHeight);
+    
+    // Body highlight (gaunt ribs suggestion)
+    if (detailLevel > 0.4) {
+      ctx.strokeStyle = `rgba(${baseRed * 1.3}, ${baseGreen}, 0, ${brightness * 0.4})`;
+      ctx.lineWidth = 1;
+      for (let r = 0; r < 4; r++) {
+        const ribY = bodyY + (bodyHeight / 5) * (r + 1);
+        ctx.beginPath();
+        ctx.moveTo(screenX - bodyWidth * 0.4, ribY);
+        ctx.lineTo(screenX + bodyWidth * 0.4, ribY);
+        ctx.stroke();
+      }
+    }
+    
+    // ELONGATED ARMS - creepy proportions
+    const armWidth = spriteWidth * 0.12;
+    const armLength = spriteHeight * 0.4;
+    const armSway = Math.sin(frameCount * 0.08 + monster.x * 5) * 0.1;
+    
+    ctx.fillStyle = `rgba(${baseRed * 0.8}, 0, 0, ${brightness * 0.8})`;
+    
+    // Left arm
+    ctx.save();
+    ctx.translate(screenX - bodyWidth * 0.5, bodyY + bodyHeight * 0.2);
+    ctx.rotate(-0.3 + armSway);
+    ctx.fillRect(-armWidth / 2, 0, armWidth, armLength);
+    
+    // Left hand/claw
+    if (detailLevel > 0.5) {
+      ctx.fillStyle = `rgba(${baseRed}, 0, 0, ${brightness})`;
+      for (let f = 0; f < 3; f++) {
+        ctx.fillRect(-armWidth / 2 + (armWidth / 3) * f, armLength, armWidth * 0.2, armLength * 0.15);
+      }
+    }
+    ctx.restore();
+    
+    // Right arm
+    ctx.save();
+    ctx.translate(screenX + bodyWidth * 0.5, bodyY + bodyHeight * 0.2);
+    ctx.rotate(0.3 - armSway);
+    ctx.fillRect(-armWidth / 2, 0, armWidth, armLength);
+    
+    // Right hand/claw
+    if (detailLevel > 0.5) {
+      ctx.fillStyle = `rgba(${baseRed}, 0, 0, ${brightness})`;
+      for (let f = 0; f < 3; f++) {
+        ctx.fillRect(-armWidth / 2 + (armWidth / 3) * f, armLength, armWidth * 0.2, armLength * 0.15);
+      }
+    }
+    ctx.restore();
+    
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  });
+}
+
+// Draw pickups
+function drawPickups() {
+  pickups.filter(p => p.active).forEach(pickup => {
+    const dx = pickup.x - player.x;
+    const dy = pickup.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > 10) return;
+    
+    const angleToPickup = Math.atan2(dy, dx);
+    let relativeAngle = angleToPickup - player.angle;
+    
+    while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
+    while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
+    
+    if (Math.abs(relativeAngle) > HALF_FOV + 0.2) return;
+    
+    const screenX = (relativeAngle / FOV + 0.5) * GAME_WIDTH;
+    const size = (GAME_HEIGHT / dist) * 0.2;
+    const y = GAME_HEIGHT / 2 - size / 2;
+    
+    const color = pickup.type === 'battery' ? COLORS.orange : COLORS.red;
+    const pulse = Math.sin(frameCount * 0.1) * 0.3 + 0.7;
+    
+    ctx.fillStyle = color;
+    ctx.shadowBlur = 20 * pulse;
+    ctx.shadowColor = color;
+    ctx.globalAlpha = pulse;
+    
+    // Draw box
+    ctx.fillRect(screenX - size / 2, y, size, size);
+    
+    // Draw icon
+    ctx.fillStyle = '#fff';
+    ctx.font = `${size * 0.6}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(pickup.type === 'battery' ? '🔋' : '❤️', screenX, y + size / 2);
+    
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  });
+}
+
+// Update game
+function update() {
+  if (gameState !== 'playing') return;
+  
+  frameCount++;
+  
+  // Update flashlight battery
+  if (flashlightOn) {
+    battery -= 0.1;
+    if (battery <= 0) {
+      battery = 0;
+      flashlightOn = false;
+      updateFlashlightUI();
+    }
+    updateBattery();
+  }
+  
+  // Player movement
+  if (input.forward) {
+    const newX = player.x + Math.cos(player.angle) * player.speed;
+    const newY = player.y + Math.sin(player.angle) * player.speed;
+    if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+      player.x = newX;
+      player.y = newY;
+      score += 0.1;
+      updateScore();
+    }
+  }
+  if (input.backward) {
+    const newX = player.x - Math.cos(player.angle) * player.speed;
+    const newY = player.y - Math.sin(player.angle) * player.speed;
+    if (map[Math.floor(newY)][Math.floor(newX)] === 0) {
+      player.x = newX;
+      player.y = newY;
+    }
+  }
+  if (input.left) {
+    player.angle -= player.rotSpeed;
+  }
+  if (input.right) {
+    player.angle += player.rotSpeed;
+  }
+  
+  // Flashlight toggle
+  if (input.flashlight && !input.flashlightPressed && battery > 0) {
+    flashlightOn = !flashlightOn;
+    input.flashlightPressed = true;
+    updateFlashlightUI();
+  } else if (!input.flashlight) {
+    input.flashlightPressed = false;
+  }
+  
+  // Interact with pickups
+  if (input.interact && !input.interactPressed) {
+    input.interactPressed = true;
+    pickups.forEach(pickup => {
+      if (!pickup.active) return;
+      const dx = pickup.x - player.x;
+      const dy = pickup.y - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < 0.5) {
+        pickup.active = false;
+        if (pickup.type === 'battery') {
+          battery = Math.min(100, battery + 30);
+          updateBattery();
+        } else if (pickup.type === 'health') {
+          health = Math.min(100, health + 25);
+          updateHealth();
+        }
+      }
+    });
+  } else if (!input.interact) {
+    input.interactPressed = false;
+  }
+  
+  // Update monsters
+  monsters.forEach(monster => monster.update());
+  
+  // Check wave completion
+  if (monsters.every(m => !m.active)) {
+    wave++;
+    updateWave();
+    spawnMonsters();
+    spawnPickups();
+    // Small health bonus for surviving wave
+    health = Math.min(100, health + 10);
+    updateHealth();
+  }
+  
+  // Check game over
+  if (health <= 0) {
+    gameOver();
+  }
+}
+
+// Draw everything
+function draw() {
+  ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  
+  draw3DView();
+  drawPickups();
+  drawMonsters();
+  
+  // Low health vignette
+  if (health < 30) {
+    const alpha = (30 - health) / 30 * 0.5;
+    const gradient = ctx.createRadialGradient(GAME_WIDTH / 2, GAME_HEIGHT / 2, 100, GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH / 2);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, `rgba(139,0,0,${alpha})`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  }
+}
+
+// Update UI
+function updateHealth() {
+  document.getElementById('health').textContent = Math.max(0, Math.floor(health));
+}
+
+function updateBattery() {
+  document.getElementById('battery').textContent = Math.max(0, Math.floor(battery));
+}
+
+function updateScore() {
+  document.getElementById('score').textContent = Math.floor(score);
+}
+
+function updateWave() {
+  document.getElementById('wave').textContent = wave;
+}
+
+function updateFlashlightUI() {
+  const indicator = document.getElementById('flashlightIndicator');
+  const state = document.getElementById('flashState');
+  indicator.style.display = 'block';
+  state.textContent = flashlightOn ? 'ON' : 'OFF';
+  state.style.color = flashlightOn ? '#00FF00' : '#666';
+}
+
+// Start game
+function startGame() {
+  generateMap();
+  player.x = 8;
+  player.y = 8;
+  player.angle = 0;
+  health = 100;
+  battery = 100;
+  flashlightOn = false;
+  score = 0;
+  wave = 1;
+  frameCount = 0;
+  monsters = [];
+  pickups = [];
+  
+  spawnMonsters();
+  spawnPickups();
+  
+  gameState = 'playing';
+  overlay.style.display = 'none';
+  document.getElementById('flashlightIndicator').style.display = 'block';
+  
+  updateHealth();
+  updateBattery();
+  updateScore();
+  updateWave();
+  updateFlashlightUI();
+  
+  gameLoop();
+}
+
+// Game over
+function gameOver() {
+  gameState = 'gameOver';
+  
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('dreadHighScore', Math.floor(highScore));
+  }
+  
+  overlay.innerHTML = `
+    <div class="title" style="font-size:64px;">DEAD</div>
+    <div class="subtitle" style="font-size:32px;margin-bottom:20px;">YOU DIED</div>
+    <div style="color:#FF0000;font-size:24px;margin-bottom:10px;">Distance Traveled: ${Math.floor(score)}m</div>
+    <div style="color:#8B0000;font-size:20px;margin-bottom:30px;">Waves Survived: ${wave - 1}</div>
+    <div style="color:#FFAA00;font-size:18px;margin-bottom:20px;">Best Distance: ${Math.floor(highScore)}m</div>
+    <div class="startBtn" onclick="startGame()" style="margin-bottom:15px;">PRESS START TO RETRY</div>
+    <div class="controls-hint">Press COIN to return to menu</div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+// Game loop
+function gameLoop() {
+  if (gameState !== 'playing') return;
+  
+  update();
+  draw();
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// Gamepad handling
+let coinPressed = false;
+let player1ButtonPressed = false;
+
+function handleGamepad() {
+  const gp0 = navigator.getGamepads()[0];
+  const gp1 = navigator.getGamepads()[1];
+  
+  if (gp0) {
+    if (gameState === 'playing') {
+      // Joystick
+      const axisX = gp0.axes[0];
+      const axisY = gp0.axes[1];
+      const dead = 0.3;
+      
+      input.left = axisX < -dead;
+      input.right = axisX > dead;
+      input.forward = axisY < -dead;
+      input.backward = axisY > dead;
+      
+      // Flashlight (button 7)
+      input.flashlight = gp0.buttons[7]?.pressed || false;
+      
+      // Interact (button 6)
+      input.interact = gp0.buttons[6]?.pressed || false;
+    }
+    
+    // COIN button
+    if (gp0.buttons[2]?.pressed && !coinPressed && (gameState === 'menu' || gameState === 'gameOver')) {
+      coinPressed = true;
+      window.location.href = 'index.html';
+    } else if (!gp0.buttons[2]?.pressed) {
+      coinPressed = false;
+    }
+  }
+  
+  if (gp1) {
+    // Start button (button 8)
+    if (gp1.buttons[8]?.pressed && !player1ButtonPressed && (gameState === 'menu' || gameState === 'gameOver')) {
+      player1ButtonPressed = true;
+      startGame();
+    } else if (!gp1.buttons[8]?.pressed) {
+      player1ButtonPressed = false;
+    }
+  }
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (gameState === 'playing') {
+    if (e.code === 'ArrowLeft') input.left = true;
+    if (e.code === 'ArrowRight') input.right = true;
+    if (e.code === 'ArrowUp') input.forward = true;
+    if (e.code === 'ArrowDown') input.backward = true;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      input.flashlight = true;
+    }
+    if (e.code === 'KeyE') input.interact = true;
+  }
+  
+  if (e.code === 'Enter' && (gameState === 'menu' || gameState === 'gameOver')) {
+    e.preventDefault();
+    startGame();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowLeft') input.left = false;
+  if (e.code === 'ArrowRight') input.right = false;
+  if (e.code === 'ArrowUp') input.forward = false;
+  if (e.code === 'ArrowDown') input.backward = false;
+  if (e.code === 'Space') input.flashlight = false;
+  if (e.code === 'KeyE') input.interact = false;
+});
+
+// Main loop
+function mainLoop() {
+  handleGamepad();
+  requestAnimationFrame(mainLoop);
+}
+
+mainLoop();
+draw();
+</script>
+</body>
+</html>
