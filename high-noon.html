@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIGH NOON - Proto7ype Arcade</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{overflow:hidden;background:#000;font-family:'Courier New',monospace;cursor:none;}
+#game-canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated;}
+#title-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg,#1a0a00 0%,#3d1a00 40%,#8B4513 70%,#CD853F 100%);display:flex;align-items:center;justify-content:center;z-index:100;}
+.title-content{text-align:center;color:#FFD700;}
+.game-title{font-size:8rem;text-shadow:4px 4px 0 #8B0000,8px 8px 0 #000;letter-spacing:0.2em;animation:titlePulse 2s ease-in-out infinite;}
+@keyframes titlePulse{0%,100%{transform:scale(1);}50%{transform:scale(1.02);}}
+.subtitle{font-size:1.5rem;color:#DEB887;margin:20px 0 40px;letter-spacing:0.3em;}
+.western-btn{font-family:'Courier New',monospace;font-size:2rem;font-weight:bold;color:#FFD700;background:#8B0000;border:3px solid #FFD700;padding:15px 60px;cursor:pointer;letter-spacing:0.2em;transition:all 0.2s;text-shadow:2px 2px 0 #000;}
+.western-btn:hover{background:#B22222;transform:scale(1.05);box-shadow:0 0 20px rgba(255,215,0,0.5);}
+.instructions{margin-top:30px;color:#A0826D;font-size:0.9rem;letter-spacing:0.1em;}
+.controls-hint{color:#666;font-size:14px;margin-top:15px;}
+.player-select{display:flex;gap:30px;justify-content:center;margin-bottom:30px;}
+.player-option{position:relative;padding:18px 40px;font-family:'Courier New',monospace;font-size:1.5rem;font-weight:bold;color:#665544;background:rgba(0,0,0,0.5);border:3px solid #554433;cursor:pointer;letter-spacing:0.15em;transition:all 0.3s;text-shadow:1px 1px 0 #000;opacity:0.5;transform:scale(0.95);}
+.player-option:hover{border-color:#CD853F;color:#DEB887;opacity:0.7;}
+.player-option.selected{color:#FFD700;border-color:#FFD700;background:linear-gradient(180deg,rgba(139,0,0,0.7),rgba(80,30,0,0.7));box-shadow:0 0 30px rgba(255,215,0,0.6),0 0 60px rgba(255,215,0,0.2),inset 0 0 20px rgba(255,215,0,0.1);text-shadow:0 0 15px #FFD700,0 0 30px #FF8C00;opacity:1;transform:scale(1.1);animation:selectedPulse 1.5s ease-in-out infinite;}
+.player-option.selected::after{content:'▶';position:absolute;left:-25px;top:50%;transform:translateY(-50%);color:#FFD700;font-size:1.2rem;text-shadow:0 0 10px #FFD700;animation:arrowBounce 0.8s ease-in-out infinite;}
+.player-option.selected::before{content:'◀';position:absolute;right:-25px;top:50%;transform:translateY(-50%);color:#FFD700;font-size:1.2rem;text-shadow:0 0 10px #FFD700;animation:arrowBounce 0.8s ease-in-out infinite;}
+@keyframes selectedPulse{0%,100%{box-shadow:0 0 30px rgba(255,215,0,0.6),0 0 60px rgba(255,215,0,0.2);}50%{box-shadow:0 0 40px rgba(255,215,0,0.8),0 0 80px rgba(255,215,0,0.3);}}
+@keyframes arrowBounce{0%,100%{opacity:1;}50%{opacity:0.4;}}
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+#game-over{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:100;}
+.gameover-content{text-align:center;color:#8B0000;}
+.gameover-content h1{font-size:6rem;text-shadow:4px 4px 0 #000;letter-spacing:0.2em;}
+.gameover-content p{color:#DEB887;font-size:1.5rem;margin:15px 0;}
+#restart-btn{margin-top:20px;}
+#wave-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:50;pointer-events:none;}
+#wave-banner h2{font-size:4rem;color:#FFD700;text-shadow:3px 3px 0 #8B0000,6px 6px 0 #000;letter-spacing:0.3em;}
+#wave-banner p{font-size:1.5rem;color:#DEB887;text-shadow:2px 2px 0 #000;margin-top:10px;}
+
+/* Split-screen HUD */
+#split-line{position:absolute;top:0;left:50%;width:3px;height:100%;background:rgba(255,215,0,0.4);z-index:20;box-shadow:0 0 8px rgba(255,215,0,0.3);}
+#score-display{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:25;color:#FFD700;font-size:20px;font-weight:bold;text-shadow:2px 2px 0 #000;background:rgba(0,0,0,0.5);padding:2px 12px;border-radius:4px;}
+#wave-display{position:absolute;top:38px;left:50%;transform:translateX(-50%);z-index:25;color:#DEB887;font-size:16px;font-weight:bold;text-shadow:2px 2px 0 #000;background:rgba(0,0,0,0.5);padding:2px 12px;border-radius:4px;}
+
+.player-hud{position:absolute;top:0;width:50%;height:100%;pointer-events:none;}
+.p1-hud{left:0;}
+.p2-hud{left:50%;}
+
+.player-label{position:absolute;top:12px;font-size:18px;font-weight:bold;text-shadow:2px 2px 0 #000;}
+.p1-label{left:15px;color:#00BFFF;}
+.p2-label{left:15px;color:#FF6347;}
+
+.crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:24px;font-weight:bold;text-shadow:0 0 4px rgba(0,0,0,0.8);opacity:0.8;}
+.aim-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border:2px solid rgba(255,0,0,0.5);border-radius:50%;pointer-events:none;display:none;}
+
+.health-bar{position:absolute;bottom:25px;left:15px;width:160px;height:18px;background:rgba(0,0,0,0.6);border:2px solid #8B4513;}
+.health-fill{width:100%;height:100%;background:linear-gradient(90deg,#8B0000,#FF0000);transition:width 0.3s;}
+.health-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:11px;font-weight:bold;text-shadow:1px 1px 0 #000;}
+
+.ammo-display{position:absolute;bottom:25px;right:15px;color:#FFD700;font-size:20px;font-weight:bold;text-shadow:2px 2px 0 #000;}
+
+.reload-prompt{position:absolute;bottom:65px;left:50%;transform:translateX(-50%);color:#FFD700;font-size:16px;font-weight:bold;text-shadow:2px 2px 0 #000;animation:blink 0.5s infinite;}
+
+.damage-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at center,transparent 50%,rgba(139,0,0,0.6) 100%);opacity:0;transition:opacity 0.1s;pointer-events:none;}
+
+.hit-marker{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#FF0000;font-size:28px;font-weight:bold;text-shadow:0 0 4px #FF0000;}
+.headshot-marker{position:absolute;top:40%;left:50%;transform:translateX(-50%);color:#FFD700;font-size:22px;font-weight:bold;text-shadow:0 0 8px #FFD700,2px 2px 0 #8B0000;letter-spacing:0.2em;transition:opacity 0.3s;pointer-events:none;}
+
+.dead-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:15;}
+.dead-overlay span{color:#8B0000;font-size:2.5rem;font-weight:bold;text-shadow:3px 3px 0 #000;animation:blink 1s infinite;}
+</style>
+</head>
+<body>
+
+<!-- Title Screen -->
+<div id="title-screen">
+  <div class="title-content">
+    <h1 class="game-title">HIGH NOON</h1>
+    <p class="subtitle">2-Player Co-op Western Showdown</p>
+    <div class="player-select">
+      <div class="player-option selected" id="opt1p" onclick="selectPlayers(1)">1 PLAYER</div>
+      <div class="player-option" id="opt2p" onclick="selectPlayers(2)">2 PLAYERS</div>
+    </div>
+    <button id="start-btn" class="western-btn">DRAW!</button>
+    <p class="instructions">Joystick: Move &amp; Turn | UP/DOWN: Move | LEFT/RIGHT: Strafe</p>
+    <p class="instructions" style="margin-top:8px;">ACTION 1: Shoot | ACTION 2: Reload | Auto-aim locks onto enemies!</p>
+    <p class="instructions" style="margin-top:8px;font-size:0.8rem;">Hide behind walls, barrels &amp; wagons to block enemy bullets!</p>
+    <p class="controls-hint">1P/2P SELECT to choose mode | START to begin | COIN to return</p>
+  </div>
+</div>
+
+<!-- HUD - Split Screen -->
+<div id="hud" style="display:none;">
+  <!-- Shared HUD (center) -->
+  <div id="score-display">BOUNTY: $<span id="score">0</span></div>
+  <div id="wave-display">WAVE: <span id="wave-num">1</span></div>
+  <div id="split-line"></div>
+
+  <!-- P1 HUD (left half) -->
+  <div class="player-hud p1-hud">
+    <div id="p1-crosshair" class="crosshair">+</div>
+    <div id="p1-aim-indicator" class="aim-indicator"></div>
+    <div class="player-label p1-label">P1</div>
+    <div id="p1-health-bar" class="health-bar"><div id="p1-health-fill" class="health-fill"></div><span id="p1-health-text" class="health-text">100</span></div>
+    <div id="p1-ammo-display" class="ammo-display"><span id="p1-ammo-current">6</span> / <span id="p1-ammo-max">6</span> 🔫</div>
+    <div id="p1-reload-prompt" class="reload-prompt" style="display:none;">RELOADING...</div>
+    <div id="p1-damage-overlay" class="damage-overlay"></div>
+    <div id="p1-hit-marker" class="hit-marker" style="display:none;">✕</div>
+    <div id="p1-headshot-marker" class="headshot-marker" style="display:none;">HEADSHOT!</div>
+    <div id="p1-dead-overlay" class="dead-overlay" style="display:none;"><span>☠ P1 DOWN ☠</span></div>
+  </div>
+
+  <!-- P2 HUD (right half) -->
+  <div class="player-hud p2-hud">
+    <div id="p2-crosshair" class="crosshair">+</div>
+    <div id="p2-aim-indicator" class="aim-indicator"></div>
+    <div class="player-label p2-label">P2</div>
+    <div id="p2-health-bar" class="health-bar"><div id="p2-health-fill" class="health-fill"></div><span id="p2-health-text" class="health-text">100</span></div>
+    <div id="p2-ammo-display" class="ammo-display"><span id="p2-ammo-current">6</span> / <span id="p2-ammo-max">6</span> 🔫</div>
+    <div id="p2-reload-prompt" class="reload-prompt" style="display:none;">RELOADING...</div>
+    <div id="p2-damage-overlay" class="damage-overlay"></div>
+    <div id="p2-hit-marker" class="hit-marker" style="display:none;">✕</div>
+    <div id="p2-headshot-marker" class="headshot-marker" style="display:none;">HEADSHOT!</div>
+    <div id="p2-dead-overlay" class="dead-overlay" style="display:none;"><span>☠ P2 DOWN ☠</span></div>
+  </div>
+</div>
+
+<!-- Game Over Screen -->
+<div id="game-over" style="display:none;">
+  <div class="gameover-content">
+    <h1>YOU DIED</h1>
+    <p>Final Bounty: $<span id="final-score">0</span></p>
+    <p>Waves Survived: <span id="final-wave">0</span></p>
+    <button id="restart-btn" class="western-btn">TRY AGAIN</button>
+    <p class="controls-hint" style="margin-top:15px;">Press START to retry | COIN to return to menu</p>
+  </div>
+</div>
+
+<!-- Wave Banner -->
+<div id="wave-banner" style="display:none;">
+  <h2>WAVE <span id="banner-wave">1</span></h2>
+  <p id="banner-subtitle">They're comin'...</p>
+</div>
+
+<canvas id="game-canvas"></canvas>
+
+<!-- Three.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- Game Scripts -->
+<script src="high-noon/ps1shader.js"></script>
+<script src="high-noon/world.js"></script>
+<script src="high-noon/player.js"></script>
+<script src="high-noon/weapons.js"></script>
+<script src="high-noon/enemies.js"></script>
+<script src="high-noon/hud.js"></script>
+<script src="high-noon/audio.js"></script>
+<script src="high-noon/gamepad.js"></script>
+<script src="high-noon/main.js"></script>
+</body>
+</html>

@@ -222,6 +222,38 @@ html,body{
   box-shadow:0 0 30px rgba(255,0,0,0.6);
 }
 
+/* Special High Noon cartridge styling */
+.cartridge-highnoon{
+  background:linear-gradient(135deg,#1a0a00 0%,#3d1a00 50%,#8B4513 100%);
+  border-color:#CD853F;
+  animation:sunsetPulse 3s ease-in-out infinite;
+  box-shadow:0 0 20px rgba(205,133,63,0.5);
+}
+@keyframes sunsetPulse{
+  0%,100%{border-color:#CD853F;box-shadow:0 0 20px rgba(205,133,63,0.5);}
+  50%{border-color:#FFD700;box-shadow:0 0 40px rgba(255,215,0,0.7);}
+}
+.cartridge-highnoon .cartridge-label{
+  color:#FFD700;
+  text-shadow:0 0 10px #CD853F,0 0 20px #8B4513;
+  font-weight:900;
+}
+.cartridge-highnoon.selected{
+  border-color:#FFD700;
+  border-width:5px;
+  box-shadow:0 0 50px rgba(255,215,0,0.8),inset 0 0 40px rgba(139,69,19,0.3);
+  transform:translateX(25px);
+  background:linear-gradient(135deg,#3d1a00 0%,#6B3410 50%,#CD853F 100%);
+}
+.cartridge-highnoon.selected .cartridge-label{
+  color:#FFD700;
+  text-shadow:0 0 20px #FFD700,0 0 40px #CD853F;
+}
+.cartridge-highnoon:hover:not(.selected){
+  border-color:#CD853F;
+  box-shadow:0 0 30px rgba(205,133,63,0.6);
+}
+
 .crt-container{
   flex:1;
   display:flex;flex-direction:column;
@@ -429,6 +461,15 @@ html,body{
       <span class="cart-icon">💀</span>
       <div class="cartridge-label">DREAD</div>
     </div>
+    <div class="cartridge cartridge-dread" data-game="9">
+      <span class="cart-icon">🏆</span>
+      <div class="cartridge-label">SOUL CUPS</div>
+    </div>
+    <div class="cartridge cartridge-highnoon" data-game="10">
+      <span class="cart-icon">🤠</span>
+      <div class="cartridge-label">HIGH NOON</div>
+      <span class="player-badge">2P</span>
+    </div>
   </div>
 
   <div class="crt-container">
@@ -521,6 +562,27 @@ html,body{
             <span style="color:#FF0000;font-weight:bold;">No weapons. Only survival.</span>
           </div>
         </div>
+
+        <div class="game-preview" id="preview9">
+          <div class="preview-icon" style="color:#8B0000">🏆</div>
+          <div class="preview-title" style="color:#FF0000;text-shadow:0 0 40px #FF0000;">SOUL CUPS</div>
+          <div class="preview-desc" style="color:#999;">
+            A cursed shell game! Track the damned soul hidden beneath three sinister chalices.
+            The cups shuffle faster each round. How many souls can you collect?
+            <span style="color:#FF0000;font-weight:bold;">Choose wrong... and you die.</span>
+          </div>
+        </div>
+
+        <div class="game-preview" id="preview10">
+          <div class="preview-icon" style="color:#FFD700">🤠</div>
+          <div class="preview-title" style="color:#FFD700;text-shadow:0 0 40px #CD853F;">HIGH NOON</div>
+          <div class="preview-desc">
+            PS1-style western FPS! Split-screen co-op - survive waves of bandits together!
+            Revolver combat with headshots, cover system, and boss fights every 5 waves.
+            <span style="color:#FFD700;font-weight:bold;">Shared score, shared map. Draw, partners!</span>
+          </div>
+          <div class="preview-multiplayer">⚡ 2-PLAYER CO-OP SPLIT-SCREEN ⚡</div>
+        </div>
       </div>
     </div>
   </div>
@@ -532,7 +594,7 @@ html,body{
 
 <script>
 let selectedGame = 0;
-const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html', 'cline-defenders.html', 'beat-protocol.html', 'dread.html'];
+const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html', 'cline-defenders.html', 'beat-protocol.html', 'dread.html', 'shell-game.html', 'high-noon.html'];
 const cartridges = document.querySelectorAll('.cartridge');
 const previews = document.querySelectorAll('.game-preview');
 
