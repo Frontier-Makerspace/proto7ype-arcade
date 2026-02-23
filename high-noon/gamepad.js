@@ -1,8 +1,8 @@
 // Arcade Gamepad Controller for High Noon - 2-Player Co-op
-// Proto7ype Arcade Cabinet Button Mapping:
-// Gamepad 0: BTN2=COIN, BTN3=START, BTN4=DOWN, BTN5=LEFT, BTN6=RIGHT, BTN7=UP, BTN8=ACTION1, BTN9=ACTION2
-// Gamepad 1: BTN4=DOWN, BTN5=LEFT, BTN6=RIGHT, BTN7=UP, BTN8=ACTION1(or 1P SELECT), BTN9=ACTION2(or 2P SELECT)
-// Axis 0 = Joystick X, Axis 1 = Joystick Y
+// Proto7ype Arcade Cabinet Button Mapping (per button-tester.html):
+// Gamepad 0 (Main): BTN2=COIN, BTN3=START, BTN4=DOWN, BTN5=LEFT, BTN6=RIGHT, BTN7=UP, BTN8=P1 ACTION1, BTN9=P1 ACTION2
+// Gamepad 1 (Select): BTN2=P2 ACTION1, BTN3=P2 ACTION2, BTN4=DOWN, BTN5=LEFT, BTN6=RIGHT, BTN7=UP, BTN8=1P SELECT, BTN9=2P SELECT
+// Both gamepads: Axis 0 = Joystick X (Left/Right), Axis 1 = Joystick Y (Up/Down)
 
 var ArcadeGamepad = {
     coinPressed: false,
@@ -84,47 +84,54 @@ var ArcadeGamepad = {
         var player = Players[playerNum - 1];
         if (!player || player.isDead) return;
 
-        // Movement
+        // Movement - D-pad buttons for forward/back/strafe
+        player.keys.w = this.btn(gp, 7);  // UP
+        player.keys.s = this.btn(gp, 4);  // DOWN
+        player.keys.a = this.btn(gp, 5);  // LEFT
+        player.keys.d = this.btn(gp, 6);  // RIGHT
+
+        // Joystick = Aiming (turn left/right, look up/down)
         var axisX = gp.axes[0] || 0;
         var axisY = gp.axes[1] || 0;
         var dead = 0.3;
+        var joystickActive = false;
 
-        // Joystick X = Turn
+        // Joystick X = Turn (horizontal aim)
         if (Math.abs(axisX) > dead) {
             player.rotation.y -= axisX * this.turnSpeed * delta;
+            joystickActive = true;
         }
 
-        // Joystick Y = Forward/Back
-        if (axisY < -dead) { player.keys.w = true; player.keys.s = false; }
-        else if (axisY > dead) { player.keys.s = true; player.keys.w = false; }
-        else {
-            if (!this.btn(gp, 7)) player.keys.w = false;
-            if (!this.btn(gp, 4)) player.keys.s = false;
+        // Joystick Y = Look up/down (vertical aim)
+        if (Math.abs(axisY) > dead) {
+            player.rotation.x -= axisY * this.turnSpeed * 0.6 * delta;
+            player.rotation.x = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, player.rotation.x));
+            joystickActive = true;
         }
 
-        if (this.btn(gp, 7)) player.keys.w = true;
-        if (this.btn(gp, 4)) player.keys.s = true;
-        player.keys.a = this.btn(gp, 5);
-        player.keys.d = this.btn(gp, 6);
+        // Track whether joystick is being used for aiming (disables auto-aim)
+        player._joystickActive = joystickActive;
 
-        // Actions
+        // Actions - P1 uses gp0 btn8/btn9, P2 uses gp1 btn2/btn3 (per button-tester.html)
         var shootKey = playerNum === 1 ? 'p1ShootPressed' : 'p2ShootPressed';
         var reloadKey = playerNum === 1 ? 'p1ReloadPressed' : 'p2ReloadPressed';
+        var shootBtn = playerNum === 1 ? 8 : 2;
+        var reloadBtn = playerNum === 1 ? 9 : 3;
 
-        if (this.btn(gp, 8) && !this[shootKey]) {
+        if (this.btn(gp, shootBtn) && !this[shootKey]) {
             this[shootKey] = true;
             Weapons.shootForPlayer(playerNum);
-        } else if (!this.btn(gp, 8)) {
+        } else if (!this.btn(gp, shootBtn)) {
             this[shootKey] = false;
         }
 
-        if (this.btn(gp, 9) && !this[reloadKey]) {
+        if (this.btn(gp, reloadBtn) && !this[reloadKey]) {
             this[reloadKey] = true;
             var inst = WeaponInstances[playerNum];
             if (inst && !inst.isReloading) {
                 Weapons.startReloadForPlayer(playerNum);
             }
-        } else if (!this.btn(gp, 9)) {
+        } else if (!this.btn(gp, reloadBtn)) {
             this[reloadKey] = false;
         }
 
@@ -138,6 +145,12 @@ var ArcadeGamepad = {
 
     handleAutoAim: function(player, delta) {
         if (player.isDead || !Game.isRunning) return;
+
+        // Skip auto-aim when player is manually aiming with joystick
+        if (player._joystickActive) {
+            HUD.showAimLock(player.playerNum, false);
+            return;
+        }
 
         var bestEnemy = null;
         var bestScore = Infinity;
