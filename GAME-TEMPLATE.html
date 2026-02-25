@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>YOUR GAME NAME - Proto7ype Arcade</title>
+<style>
+/* ============================================
+   BASE STYLES — Cyberpunk Arcade Theme
+   ============================================ */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(to bottom, #0A0A0F, #1A1A2E);
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+
+/* Game container — centers everything */
+#gameContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Score bar above the canvas */
+#scoreBoard {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+}
+.score { color: #9D4EDD; }
+.highScore { color: #00F5FF; }
+
+/* The game canvas */
+canvas {
+  border: 4px solid #9D4EDD;
+  border-radius: 8px;
+  box-shadow: 0 0 20px #9D4EDD;
+  background: #0A0A0F;
+}
+
+/* ============================================
+   OVERLAY — Start Screen & Game Over
+   ============================================ */
+#overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 900px;
+  height: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.title {
+  font-size: 56px;
+  color: #9D4EDD;
+  text-shadow: 0 0 30px #9D4EDD;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+@keyframes glow {
+  from { text-shadow: 0 0 20px #9D4EDD; }
+  to { text-shadow: 0 0 40px #9D4EDD, 0 0 60px #9D4EDD; }
+}
+
+.subtitle {
+  font-size: 20px;
+  color: #00F5FF;
+  margin-bottom: 30px;
+}
+
+.instructions {
+  color: #fff;
+  font-size: 16px;
+  line-height: 2;
+  margin-bottom: 30px;
+}
+
+.startBtn {
+  padding: 15px 30px;
+  background: #FF006E;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  box-shadow: 0 0 20px #FF006E;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ============================================
+   CRT SCANLINE OVERLAY — Retro Effect
+   ============================================ */
+.scanline {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+</style>
+</head>
+<body>
+
+<!-- CRT scanline overlay for retro arcade feel -->
+<div class="scanline"></div>
+
+<div id="gameContainer">
+  <!-- Score display -->
+  <div id="scoreBoard">
+    <div class="score">SCORE: <span id="score">0</span></div>
+    <div class="highScore">HI: <span id="highScore">0</span></div>
+  </div>
+
+  <!-- Canvas + overlay wrapper (must be position:relative) -->
+  <div style="position: relative;">
+    <canvas id="canvas" width="900" height="600"></canvas>
+
+    <!-- Start/Game Over overlay -->
+    <div id="overlay">
+      <div class="title">YOUR GAME</div>
+      <div class="subtitle">Awesome Tagline Here</div>
+      <div class="instructions">
+        <strong>CONTROLS:</strong><br>
+        Joystick / Arrow Keys: Move<br>
+        Button 7 / Space: Action<br>
+        COIN: Return to Menu
+      </div>
+      <button class="startBtn" onclick="startGame()">PRESS START</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// CANVAS & CONTEXT SETUP
+// ============================================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+const GAME_WIDTH = 900;
+const GAME_HEIGHT = 600;
+
+// ============================================
+// COLOR PALETTE — Proto7ype Arcade Theme
+// ============================================
+const COLORS = {
+  purple:      '#9D4EDD',
+  purpleLight: '#C77DFF',
+  pink:        '#FF006E',
+  cyan:        '#00F5FF',
+  dark:        '#0A0A0F',
+  darkBg:      '#1A1A2E',
+  gold:        '#FFD700',
+  grid:        '#4A148C',
+};
+
+// ============================================
+// GAME STATE
+// ============================================
+let gameState = 'start';  // 'start' | 'playing' | 'gameOver'
+let score = 0;
+let highScore = parseInt(localStorage.getItem('yourGameHighScore')) || 0;
+let frameCount = 0;
+let particles = [];
+
+// TODO: Add your game-specific state here
+// let player = { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, speed: 4 };
+
+// Display loaded high score
+document.getElementById('highScore').textContent = highScore;
+
+// ============================================
+// PARTICLE SYSTEM — For effects & juice
+// ============================================
+function createParticles(x, y, color, count = 15) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      life: 30,
+      maxLife: 30,
+      size: Math.random() * 8 + 4,
+      color: color
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    p.size *= 0.95;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+// ============================================
+// BACKGROUND — Grid + stars
+// ============================================
+function drawBackground() {
+  // Gradient fill
+  const gradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
+  gradient.addColorStop(0, COLORS.dark);
+  gradient.addColorStop(1, COLORS.darkBg);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  // Grid lines
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.2;
+  for (let x = 0; x <= GAME_WIDTH; x += 30) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, GAME_HEIGHT);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= GAME_HEIGHT; y += 30) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(GAME_WIDTH, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================
+// GAME LOGIC — Replace with your game!
+// ============================================
+
+function update() {
+  if (gameState !== 'playing') return;
+
+  frameCount++;
+
+  // TODO: Update your game objects here
+  // e.g., move player, move enemies, check collisions
+
+  updateParticles();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  drawBackground();
+
+  // TODO: Draw your game objects here
+  // e.g., player, enemies, projectiles, items
+
+  // Example placeholder text
+  ctx.fillStyle = COLORS.cyan;
+  ctx.font = '24px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Your game goes here!', GAME_WIDTH / 2, GAME_HEIGHT / 2);
+  ctx.fillStyle = COLORS.purple;
+  ctx.font = '16px monospace';
+  ctx.fillText('Edit GAME-TEMPLATE.html to get started', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40);
+
+  drawParticles();
+}
+
+// ============================================
+// GAME STATE MANAGEMENT
+// ============================================
+
+function startGame() {
+  score = 0;
+  frameCount = 0;
+  particles = [];
+  gameState = 'playing';
+  overlay.style.display = 'none';
+  document.getElementById('score').textContent = '0';
+
+  // TODO: Reset your game state here
+  // e.g., player position, enemies array, etc.
+
+  gameLoop();
+}
+
+function gameOver() {
+  gameState = 'gameOver';
+
+  // Update high score
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('yourGameHighScore', highScore);
+    document.getElementById('highScore').textContent = highScore;
+  }
+
+  // Show game over overlay
+  overlay.innerHTML = `
+    <div class="title" style="font-size:48px; color:#FF006E;">GAME OVER</div>
+    <div class="subtitle" style="font-size:32px; margin-bottom:10px;">Score: ${score}</div>
+    <div class="subtitle" style="font-size:28px; margin-bottom:30px;">High Score: ${highScore}</div>
+    <button class="startBtn" onclick="startGame()" style="margin-bottom:15px;">PRESS START TO RESTART</button>
+    <div style="color:#00F5FF; font-size:16px;">Press COIN to return to menu</div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+// ============================================
+// GAME LOOP
+// ============================================
+
+function gameLoop() {
+  if (gameState !== 'playing') return;
+
+  update();
+  draw();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================================
+// GAMEPAD INPUT
+// ============================================
+
+// Edge-detection flags (prevent repeated triggers)
+let coinPressed = false;
+let startPressed = false;
+let actionPressed = false;
+
+function handleGamepad() {
+  const gp = navigator.getGamepads()[0];
+  if (!gp) return;
+
+  if (gameState === 'playing') {
+    // --- Joystick movement ---
+    const deadzone = 0.3;
+    const axisX = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
+    const axisY = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+
+    // TODO: Use axisX and axisY to move your player
+    // e.g., player.x += axisX * player.speed;
+    //        player.y += axisY * player.speed;
+
+    // --- Action button (Button 7) ---
+    if (gp.buttons[7]?.pressed && !actionPressed) {
+      actionPressed = true;
+      // TODO: Perform action (shoot, jump, etc.)
+    } else if (!gp.buttons[7]?.pressed) {
+      actionPressed = false;
+    }
+  }
+
+  // --- COIN button (Button 2) — Return to menu ---
+  // Works from start screen and game over screen
+  if (gp.buttons[2]?.pressed && !coinPressed) {
+    coinPressed = true;
+    if (gameState === 'start' || gameState === 'gameOver') {
+      window.location.href = 'index.html';
+    }
+  } else if (!gp.buttons[2]?.pressed) {
+    coinPressed = false;
+  }
+
+  // --- START button (Button 3) — Start/restart game ---
+  if (gp.buttons[3]?.pressed && !startPressed) {
+    startPressed = true;
+    if (gameState === 'start' || gameState === 'gameOver') {
+      startGame();
+    }
+  } else if (!gp.buttons[3]?.pressed) {
+    startPressed = false;
+  }
+}
+
+// ============================================
+// KEYBOARD INPUT
+// ============================================
+
+const keys = {};
+
+document.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+
+  // Start/restart
+  if ((e.code === 'Space' || e.code === 'Enter') && gameState !== 'playing') {
+    e.preventDefault();
+    startGame();
+  }
+
+  // Prevent scrolling
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    e.preventDefault();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+});
+
+// Use in your update() function:
+// if (keys['ArrowLeft'])  player.x -= player.speed;
+// if (keys['ArrowRight']) player.x += player.speed;
+// if (keys['ArrowUp'])    player.y -= player.speed;
+// if (keys['ArrowDown'])  player.y += player.speed;
+
+// ============================================
+// MAIN LOOP — Polls gamepad every frame
+// ============================================
+
+function mainLoop() {
+  handleGamepad();
+  requestAnimationFrame(mainLoop);
+}
+
+// Start polling
+mainLoop();
+</script>
+</body>
+</html>
