@@ -934,6 +934,27 @@ function spawnPickups() {
 }
 
 // ============================================================
+// LINE OF SIGHT CHECK (wall occlusion)
+// ============================================================
+function hasLineOfSight(x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const steps = Math.ceil(dist / 0.15);
+  const stepX = dx / steps;
+  const stepY = dy / steps;
+  for (let i = 1; i < steps; i++) {
+    const cx = x1 + stepX * i;
+    const cy = y1 + stepY * i;
+    const mx = Math.floor(cx);
+    const my = Math.floor(cy);
+    if (mx < 0 || mx >= MAP_SIZE || my < 0 || my >= MAP_SIZE) return false;
+    if (map[my][mx] === 1) return false;
+  }
+  return true;
+}
+
+// ============================================================
 // RAYCASTING
 // ============================================================
 function castRay(angle) {
@@ -1149,6 +1170,7 @@ function drawMonsters() {
     const dy2 = monster.y - player.y;
     const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
     if (d2 > 12 || d2 < 1.5) return; // Only for distant monsters
+    if (!hasLineOfSight(player.x, player.y, monster.x, monster.y)) return;
     if (!flashlightOn && d2 > 1.5 && d2 < 8) {
       const ang = Math.atan2(dy2, dx2);
       let rel = ang - player.angle;
@@ -1180,6 +1202,7 @@ function drawMonsters() {
     const dist = Math.sqrt(dx * dx + dy * dy);
     const visThresh = flashlightOn ? 8 : 1.5;
     if (dist > visThresh) return;
+    if (!hasLineOfSight(player.x, player.y, monster.x, monster.y)) return;
 
     const angleToMonster = Math.atan2(dy, dx);
     let relAngle = angleToMonster - player.angle;
@@ -1207,25 +1230,52 @@ function drawMonsters() {
 
     ctx.save();
 
-    // SHADOW TENDRILS emanating from monster
-    if (detail > 0.2 && bright > 0.1) {
-      ctx.globalAlpha = bright * 0.3;
-      for (let t = 0; t < 4; t++) {
-        const tendrilAngle = Math.sin(frameCount * 0.03 + t * 1.5 + monster.x) * 0.8;
-        const tendrilLen = spriteH * (0.3 + Math.sin(frameCount * 0.05 + t) * 0.15);
-        const tx = screenX + twitchVX + Math.cos(tendrilAngle - Math.PI / 2 + t * 0.5) * spriteW * 0.3;
-        const ty = spriteY + spriteH * 0.5;
-        ctx.strokeStyle = `rgba(30, 0, 0, ${bright * 0.5})`;
-        ctx.lineWidth = 2 + Math.random() * 3;
+    // WISPY SHADOW TENDRILS - fluid bezier curves, many of them
+    if (detail > 0.15 && bright > 0.08) {
+      const numTendrils = 8 + Math.floor(closeFactor * 4);
+      for (let t = 0; t < numTendrils; t++) {
+        const seed = monster.x * 7.3 + t * 2.1;
+        const tendrilPhase = frameCount * 0.025 + t * 0.9 + seed;
+        const baseAngle = (t / numTendrils) * Math.PI * 2 + Math.sin(tendrilPhase) * 0.5;
+        const tendrilLen = spriteH * (0.25 + Math.sin(frameCount * 0.04 + t * 1.3) * 0.15 + closeFactor * 0.15);
+        const originX = screenX + twitchVX + Math.cos(baseAngle) * spriteW * 0.15;
+        const originY = spriteY + spriteH * 0.5 + Math.sin(baseAngle) * spriteH * 0.15;
+        const thickness = (1.5 + Math.sin(seed + frameCount * 0.06) * 1.5 + closeFactor * 2) * bright;
+        const waveMag = tendrilLen * 0.4;
+        const endX = originX + Math.cos(baseAngle) * tendrilLen;
+        const endY = originY + Math.sin(baseAngle) * tendrilLen + tendrilLen * 0.2;
+        const cp1x = originX + Math.cos(baseAngle + 0.3) * tendrilLen * 0.4 + Math.sin(tendrilPhase * 1.3) * waveMag * 0.5;
+        const cp1y = originY + Math.sin(baseAngle) * tendrilLen * 0.3 + Math.cos(tendrilPhase) * waveMag * 0.3;
+        const cp2x = endX - Math.cos(baseAngle - 0.2) * tendrilLen * 0.3 + Math.sin(tendrilPhase * 0.7) * waveMag * 0.4;
+        const cp2y = endY - tendrilLen * 0.2 + Math.cos(tendrilPhase * 1.1) * waveMag * 0.3;
+
+        ctx.globalAlpha = bright * (0.15 + closeFactor * 0.2) * (0.5 + Math.sin(seed + frameCount * 0.03) * 0.5);
+        ctx.strokeStyle = `rgba(${30 + Math.floor(closeFactor * 40)}, 0, 0, 1)`;
+        ctx.lineWidth = thickness;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.quadraticCurveTo(
-          tx + Math.cos(tendrilAngle) * tendrilLen * 0.5,
-          ty + Math.sin(tendrilAngle) * tendrilLen * 0.5 + tendrilLen * 0.3,
-          tx + Math.cos(tendrilAngle) * tendrilLen,
-          ty + tendrilLen
-        );
+        ctx.moveTo(originX, originY);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
         ctx.stroke();
+
+        // Sub-branch on some tendrils
+        if (t % 3 === 0 && detail > 0.3) {
+          const branchT = 0.6 + Math.sin(seed) * 0.2;
+          const bx = originX * (1 - branchT) * (1 - branchT) * (1 - branchT) + 3 * cp1x * branchT * (1 - branchT) * (1 - branchT) + 3 * cp2x * branchT * branchT * (1 - branchT) + endX * branchT * branchT * branchT;
+          const by = originY * (1 - branchT) * (1 - branchT) * (1 - branchT) + 3 * cp1y * branchT * (1 - branchT) * (1 - branchT) + 3 * cp2y * branchT * branchT * (1 - branchT) + endY * branchT * branchT * branchT;
+          const branchAngle = baseAngle + Math.sin(tendrilPhase * 2) * 1.2;
+          const branchLen = tendrilLen * 0.35;
+          ctx.lineWidth = thickness * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.quadraticCurveTo(
+            bx + Math.cos(branchAngle) * branchLen * 0.5,
+            by + Math.sin(branchAngle) * branchLen * 0.5,
+            bx + Math.cos(branchAngle) * branchLen,
+            by + Math.sin(branchAngle) * branchLen
+          );
+          ctx.stroke();
+        }
       }
       ctx.globalAlpha = 1;
     }
@@ -1331,50 +1381,160 @@ function drawMonsters() {
     
     ctx.restore(); // End head tilt transform
 
-    // BODY
-    const bodyY = spriteY + spriteH * 0.4 + twitchVY;
-    const bodyH = spriteH * 0.45;
-    const bodyW = spriteW * 0.25;
-    ctx.shadowBlur = 15 * bright;
-    ctx.fillStyle = `rgba(${Math.floor(baseR * 0.6)}, 0, 0, ${bright * 0.7})`;
-    ctx.fillRect(headCX - bodyW / 2, bodyY, bodyW, bodyH);
+    // WRITHING ASYMMETRIC MASS BODY
+    const bodyY = spriteY + spriteH * 0.32 + twitchVY;
+    const bodyH = spriteH * 0.55;
+    const bodyW = spriteW * 0.4;
+    const bodyCX = headCX;
+    const bodyCY = bodyY + bodyH * 0.4;
 
-    // ARMS - longer, more menacing reach
-    const armW = spriteW * 0.1;
-    const armL = spriteH * 0.5;
-    const armSway = Math.sin(frameCount * 0.08 + monster.x * 5) * 0.15;
-    const reachForward = dist < 2 ? 0.4 : 0;
-    ctx.fillStyle = `rgba(${Math.floor(baseR * 0.8)}, 0, 0, ${bright * 0.8})`;
-    ctx.save();
-    ctx.translate(headCX - bodyW * 0.5, bodyY + bodyH * 0.15);
-    ctx.rotate(-0.4 + armSway - reachForward);
-    ctx.fillRect(-armW / 2, 0, armW, armL);
-    // Clawed fingers
+    // Chromatic aberration aura (offset color layers)
+    if (detail > 0.2 && bright > 0.15) {
+      ctx.globalAlpha = bright * 0.15;
+      ctx.fillStyle = `rgba(0, 255, 255, 1)`;
+      ctx.beginPath();
+      for (let a = 0; a < Math.PI * 2; a += 0.2) {
+        const blobR = bodyW * (0.5 + Math.sin(a * 2.3 + frameCount * 0.04 + monster.x * 3) * 0.15 + Math.sin(a * 3.7 + frameCount * 0.06) * 0.1);
+        const bx = bodyCX + Math.cos(a) * blobR + 3;
+        const by = bodyCY + Math.sin(a) * blobR * 1.3;
+        if (a === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 0, 0, 1)`;
+      ctx.beginPath();
+      for (let a = 0; a < Math.PI * 2; a += 0.2) {
+        const blobR = bodyW * (0.5 + Math.sin(a * 2.3 + frameCount * 0.04 + monster.x * 3) * 0.15 + Math.sin(a * 3.7 + frameCount * 0.06) * 0.1);
+        const bx = bodyCX + Math.cos(a) * blobR - 3;
+        const by = bodyCY + Math.sin(a) * blobR * 1.3;
+        if (a === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // Main body mass - pulsating blob with distorted bezier contour
+    ctx.shadowBlur = 20 * bright + closeFactor * 15;
+    ctx.shadowColor = monster.color;
+    ctx.fillStyle = `rgba(${Math.floor(baseR * 0.5)}, ${Math.floor(baseG * 0.3)}, 0, ${bright * 0.8})`;
+    ctx.beginPath();
+    const bodyPoints = 16;
+    for (let i = 0; i <= bodyPoints; i++) {
+      const a = (i / bodyPoints) * Math.PI * 2;
+      const noiseSeed = monster.x * 5.7 + i * 1.3;
+      const pulse = Math.sin(frameCount * 0.06 + noiseSeed) * 0.12 + Math.sin(frameCount * 0.09 + i * 2.1) * 0.08;
+      const asymmetry = Math.sin(a * 1.5 + monster.x * 2) * 0.15;
+      const blobR = bodyW * (0.45 + pulse + asymmetry);
+      const stretch = 1.2 + Math.sin(a + frameCount * 0.03) * 0.15;
+      const bx = bodyCX + Math.cos(a) * blobR;
+      const by = bodyCY + Math.sin(a) * blobR * stretch;
+      if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner fleshy layers (overlapping translucent blobs)
     if (detail > 0.3) {
-      for (let f = 0; f < 3; f++) {
-        ctx.fillRect(-armW / 2 + f * armW * 0.4, armL, armW * 0.3, armL * 0.15);
+      for (let layer = 0; layer < 3; layer++) {
+        const layerPhase = frameCount * 0.04 + layer * 2.1 + monster.x * 3;
+        const layerOx = Math.sin(layerPhase) * bodyW * 0.12;
+        const layerOy = Math.cos(layerPhase * 0.7) * bodyH * 0.08;
+        const layerScale = 0.35 - layer * 0.08;
+        ctx.fillStyle = `rgba(${Math.floor(baseR * (0.4 + layer * 0.15))}, 0, 0, ${bright * (0.25 - layer * 0.05)})`;
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 2; a += 0.3) {
+          const r = bodyW * layerScale + Math.sin(a * 3 + layerPhase) * bodyW * 0.06;
+          const px = bodyCX + layerOx + Math.cos(a) * r;
+          const py = bodyCY + layerOy + Math.sin(a) * r * 1.1;
+          if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
       }
     }
-    ctx.restore();
-    ctx.save();
-    ctx.translate(headCX + bodyW * 0.5, bodyY + bodyH * 0.15);
-    ctx.rotate(0.4 - armSway + reachForward);
-    ctx.fillRect(-armW / 2, 0, armW, armL);
-    if (detail > 0.3) {
-      for (let f = 0; f < 3; f++) {
-        ctx.fillRect(-armW / 2 + f * armW * 0.4, armL, armW * 0.3, armL * 0.15);
+
+    // Dissolving lower body - dripping wisps trailing into shadow
+    ctx.shadowBlur = 0;
+    if (detail > 0.2) {
+      const numDrips = 5 + Math.floor(closeFactor * 4);
+      for (let d = 0; d < numDrips; d++) {
+        const dSeed = monster.x * 3.3 + d * 1.7;
+        const dX = bodyCX + (d / numDrips - 0.5) * bodyW * 1.2 + Math.sin(dSeed + frameCount * 0.03) * bodyW * 0.1;
+        const dStartY = bodyCY + bodyH * 0.3 + Math.sin(dSeed * 2) * bodyH * 0.1;
+        const dLen = spriteH * (0.12 + Math.sin(frameCount * 0.05 + dSeed) * 0.06 + closeFactor * 0.08);
+        const dWidth = (2 + Math.sin(dSeed) * 1.5 + closeFactor * 2) * bright;
+        const dAlpha = bright * (0.3 + Math.sin(dSeed + frameCount * 0.04) * 0.15);
+        ctx.strokeStyle = `rgba(${Math.floor(baseR * 0.4)}, 0, 0, ${dAlpha})`;
+        ctx.lineWidth = dWidth;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(dX, dStartY);
+        ctx.quadraticCurveTo(
+          dX + Math.sin(frameCount * 0.06 + dSeed) * bodyW * 0.15,
+          dStartY + dLen * 0.6,
+          dX + Math.sin(frameCount * 0.04 + dSeed * 1.3) * bodyW * 0.1,
+          dStartY + dLen
+        );
+        ctx.stroke();
       }
     }
-    ctx.restore();
+
+    // ORGANIC ARMS - tapered bezier limbs reaching toward player
+    const armSway = Math.sin(frameCount * 0.07 + monster.x * 5) * 0.2;
+    const reachForward = dist < 2.5 ? 0.5 + Math.sin(frameCount * 0.12) * 0.15 : 0;
+    if (detail > 0.15) {
+      for (let side = -1; side <= 1; side += 2) {
+        const armSeed = monster.x * 4 + side * 7;
+        const shoulderX = bodyCX + side * bodyW * 0.35;
+        const shoulderY = bodyCY - bodyH * 0.15;
+        const armAngle = side * (0.6 - reachForward) + armSway * side;
+        const armLen = spriteH * (0.4 + closeFactor * 0.1);
+        const elbowX = shoulderX + Math.cos(armAngle + Math.PI * 0.6 * side) * armLen * 0.5;
+        const elbowY = shoulderY + Math.sin(Math.abs(armAngle) + 0.5) * armLen * 0.4 + armLen * 0.2;
+        const handX = elbowX + Math.cos(armAngle + Math.PI * 0.4 * side + Math.sin(frameCount * 0.08 + armSeed) * 0.3) * armLen * 0.5;
+        const handY = elbowY + armLen * 0.35 + Math.sin(frameCount * 0.1 + armSeed) * armLen * 0.05;
+
+        // Tapered arm stroke
+        ctx.strokeStyle = `rgba(${Math.floor(baseR * 0.7)}, 0, 0, ${bright * 0.75})`;
+        ctx.lineWidth = (3 + closeFactor * 4) * bright;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(shoulderX, shoulderY);
+        ctx.quadraticCurveTo(elbowX, elbowY, handX, handY);
+        ctx.stroke();
+
+        // Thinner forearm
+        ctx.lineWidth = (2 + closeFactor * 2) * bright;
+        ctx.beginPath();
+        ctx.moveTo(elbowX, elbowY);
+        ctx.lineTo(handX, handY);
+        ctx.stroke();
+
+        // Elongated claw wisps at hand
+        if (detail > 0.3) {
+          for (let f = 0; f < 4; f++) {
+            const fAngle = armAngle * 0.5 + (f - 1.5) * 0.3 + Math.sin(frameCount * 0.1 + f + armSeed) * 0.15;
+            const fLen = armLen * (0.12 + Math.random() * 0.06);
+            ctx.strokeStyle = `rgba(${Math.floor(baseR * 0.9)}, 0, 0, ${bright * 0.6})`;
+            ctx.lineWidth = (1 + closeFactor) * bright;
+            ctx.beginPath();
+            ctx.moveTo(handX, handY);
+            ctx.lineTo(handX + Math.cos(fAngle + 1) * fLen, handY + Math.sin(fAngle + 0.8) * fLen + fLen * 0.5);
+            ctx.stroke();
+          }
+        }
+      }
+    }
 
     // Blood drips from monster
     if (detail > 0.3 && bright > 0.2) {
       ctx.fillStyle = `rgba(100, 0, 0, ${bright * 0.5})`;
       ctx.shadowBlur = 0;
-      for (let bd = 0; bd < 3; bd++) {
-        const bx = headCX + (Math.random() - 0.5) * spriteW * 0.4;
-        const by = headY + headR + Math.random() * spriteH * 0.3;
-        ctx.fillRect(bx, by, 1 + Math.random() * 2, 5 + Math.random() * 15);
+      for (let bd = 0; bd < 5; bd++) {
+        const bx = bodyCX + (Math.random() - 0.5) * bodyW * 0.8;
+        const by = bodyCY + Math.random() * bodyH * 0.4;
+        ctx.fillRect(bx, by, 1 + Math.random() * 2, 5 + Math.random() * 18);
       }
     }
 
