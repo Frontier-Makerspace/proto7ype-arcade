@@ -1298,9 +1298,9 @@ function updateHamsterWheel(delta, elapsed) {
       klaus.position.y = wheelH + KLAUS_GROUND_OFFSET;
     }
     
-    // Face Klaus along the wheel axis (looking along Z)
-    // Smoothly rotate to face along the wheel
-    const wheelFaceAngle = Math.PI; // face -Z direction (toward camera usually)
+    // Face Klaus perpendicular to the wheel axle (axle runs along Z, so Klaus faces along X)
+    // Smoothly rotate to face along X direction (into the wheel)
+    const wheelFaceAngle = Math.PI / 2; // face along +X direction (perpendicular to axle)
     let diff = wheelFaceAngle - klausState.rotation;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
