@@ -83,26 +83,264 @@ const World = {
         }
     },
 
+    // Environment references for animation
+    sunMesh: null,
+    sunGlow: null,
+    sunCorona: null,
+    godRays: [],
+    skyDome: null,
+    mountainMeshes: [],
+    ambientLight: null,
+    sunLight: null,
+    fillLight: null,
+    currentWave: 1,
+    targetWave: 1,
+    envTransition: 1, // 0 = transitioning, 1 = settled
+    envTime: 0,
+
+    // Sun evolution stages
+    sunStages: [
+        // Wave 1-2: High Noon
+        { sunColor: 0xFFFFA0, sunPos: [30, 55, -40], sunScale: 1.0, glowColor: 0xFFFF88, glowOpacity: 0.15,
+          skyColor: 0xE8A64C, fogColor: 0xDEB887, bgColor: 0xE8A64C,
+          ambientColor: 0xDEB887, ambientIntensity: 0.6,
+          sunLightColor: 0xFFE4B5, sunLightIntensity: 0.8,
+          fillColor: 0xFFAA66, fillIntensity: 0.3,
+          mountainTint: 0x8B7355 },
+        // Wave 3-4: Afternoon
+        { sunColor: 0xFFD060, sunPos: [35, 40, -45], sunScale: 1.15, glowColor: 0xFFCC44, glowOpacity: 0.2,
+          skyColor: 0xD4883A, fogColor: 0xCCA060, bgColor: 0xD4883A,
+          ambientColor: 0xCC9955, ambientIntensity: 0.55,
+          sunLightColor: 0xFFCC88, sunLightIntensity: 0.75,
+          fillColor: 0xFF9944, fillIntensity: 0.25,
+          mountainTint: 0x9E7B55 },
+        // Wave 5-6: Sunset
+        { sunColor: 0xFF8830, sunPos: [40, 22, -50], sunScale: 1.4, glowColor: 0xFF6622, glowOpacity: 0.3,
+          skyColor: 0xCC5522, fogColor: 0xBB6633, bgColor: 0xCC5522,
+          ambientColor: 0xBB6633, ambientIntensity: 0.45,
+          sunLightColor: 0xFF8844, sunLightIntensity: 0.65,
+          fillColor: 0xFF6633, fillIntensity: 0.2,
+          mountainTint: 0xA06030 },
+        // Wave 7-8: Dusk
+        { sunColor: 0xDD3318, sunPos: [45, 10, -55], sunScale: 1.7, glowColor: 0xCC2200, glowOpacity: 0.35,
+          skyColor: 0x6B2244, fogColor: 0x884455, bgColor: 0x6B2244,
+          ambientColor: 0x885566, ambientIntensity: 0.35,
+          sunLightColor: 0xDD6644, sunLightIntensity: 0.5,
+          fillColor: 0xCC4433, fillIntensity: 0.15,
+          mountainTint: 0x7A4030 },
+        // Wave 9+: Night / Moon
+        { sunColor: 0xCCDDFF, sunPos: [25, 60, -35], sunScale: 0.8, glowColor: 0x8899CC, glowOpacity: 0.12,
+          skyColor: 0x0A0A2E, fogColor: 0x1A1A3E, bgColor: 0x0A0A2E,
+          ambientColor: 0x334466, ambientIntensity: 0.25,
+          sunLightColor: 0x8899BB, sunLightIntensity: 0.35,
+          fillColor: 0x445577, fillIntensity: 0.1,
+          mountainTint: 0x3A3A55 }
+    ],
+
+    getStageIndex: function(wave) {
+        if (wave <= 2) return 0;
+        if (wave <= 4) return 1;
+        if (wave <= 6) return 2;
+        if (wave <= 8) return 3;
+        return 4;
+    },
+
+    getStageBlend: function(wave) {
+        // Returns [stageA, stageB, t] for smooth blending between stages
+        var stages = this.sunStages;
+        var idx = this.getStageIndex(wave);
+        return [stages[idx], stages[idx], 0]; // snap to stage
+    },
+
+    setTargetWave: function(wave) {
+        this.targetWave = wave;
+        this.envTransition = 0;
+    },
+
     createSkybox: function() {
-        // Sky dome
-        var skyGeo = new THREE.SphereGeometry(100, 8, 6);
+        // Sky dome - higher poly for smoother look
+        var skyGeo = new THREE.SphereGeometry(100, 16, 12);
         var skyMat = new THREE.MeshBasicMaterial({
             color: 0xE8A64C,
             side: THREE.BackSide
         });
-        var sky = new THREE.Mesh(skyGeo, skyMat);
-        this.scene.add(sky);
+        this.skyDome = new THREE.Mesh(skyGeo, skyMat);
+        this.scene.add(this.skyDome);
 
-        // Sun
-        var sunGeo = new THREE.SphereGeometry(3, 6, 6);
-        var sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFF88 });
-        var sun = new THREE.Mesh(sunGeo, sunMat);
-        sun.position.set(30, 50, -40);
-        this.scene.add(sun);
+        // Sun - higher poly, beautiful sphere
+        var sunGeo = new THREE.SphereGeometry(3, 16, 16);
+        var sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFFA0 });
+        this.sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        this.sunMesh.position.set(30, 55, -40);
+        this.scene.add(this.sunMesh);
+
+        // Sun inner glow - slightly larger transparent sphere
+        var glowGeo = new THREE.SphereGeometry(4.5, 16, 16);
+        var glowMat = new THREE.MeshBasicMaterial({
+            color: 0xFFFF88,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.FrontSide
+        });
+        this.sunGlow = new THREE.Mesh(glowGeo, glowMat);
+        this.sunGlow.position.copy(this.sunMesh.position);
+        this.scene.add(this.sunGlow);
+
+        // Sun corona - large soft outer glow
+        var coronaGeo = new THREE.SphereGeometry(7, 16, 16);
+        var coronaMat = new THREE.MeshBasicMaterial({
+            color: 0xFFDD66,
+            transparent: true,
+            opacity: 0.07,
+            side: THREE.FrontSide
+        });
+        this.sunCorona = new THREE.Mesh(coronaGeo, coronaMat);
+        this.sunCorona.position.copy(this.sunMesh.position);
+        this.scene.add(this.sunCorona);
+
+        // God rays - thin stretched planes emanating from sun
+        this.godRays = [];
+        var rayColors = [0xFFEE88, 0xFFDD66, 0xFFCC44, 0xFFBB33, 0xFFAA22];
+        for (var r = 0; r < 5; r++) {
+            var rayGeo = new THREE.PlaneGeometry(1.2, 35);
+            var rayMat = new THREE.MeshBasicMaterial({
+                color: rayColors[r],
+                transparent: true,
+                opacity: 0.04 + Math.random() * 0.03,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            var ray = new THREE.Mesh(rayGeo, rayMat);
+            ray.position.copy(this.sunMesh.position);
+            ray.position.y -= 12;
+            ray.rotation.z = (r / 5) * Math.PI + Math.random() * 0.3;
+            ray.userData.baseRotZ = ray.rotation.z;
+            ray.userData.rayIndex = r;
+            this.scene.add(ray);
+            this.godRays.push(ray);
+        }
 
         // Fog
         this.scene.fog = new THREE.Fog(0xDEB887, 30, 90);
         this.scene.background = new THREE.Color(0xE8A64C);
+    },
+
+    updateEnvironment: function(wave, delta) {
+        this.envTime += delta;
+
+        // Smooth transition
+        if (this.envTransition < 1) {
+            this.envTransition = Math.min(1, this.envTransition + delta * 0.4); // ~2.5 sec transition
+        }
+
+        var stageIdx = this.getStageIndex(wave);
+        var prevIdx = this.getStageIndex(this.currentWave);
+        var stage = this.sunStages[stageIdx];
+        var prevStage = this.sunStages[prevIdx];
+        var t = this.envTransition;
+
+        // Helper: lerp color
+        var lerpC = function(c1, c2, t) {
+            var a = new THREE.Color(c1);
+            var b = new THREE.Color(c2);
+            return a.lerp(b, t);
+        };
+
+        // Helper: lerp value
+        var lerpV = function(a, b, t) { return a + (b - a) * t; };
+
+        // --- Sun position (smooth lerp) ---
+        var targetX = lerpV(prevStage.sunPos[0], stage.sunPos[0], t);
+        var targetY = lerpV(prevStage.sunPos[1], stage.sunPos[1], t);
+        var targetZ = lerpV(prevStage.sunPos[2], stage.sunPos[2], t);
+        this.sunMesh.position.set(targetX, targetY, targetZ);
+
+        // --- Sun breathing pulse ---
+        var breathe = 1 + Math.sin(this.envTime * 1.2) * 0.025;
+        var targetScale = lerpV(prevStage.sunScale, stage.sunScale, t) * breathe;
+        this.sunMesh.scale.setScalar(targetScale);
+
+        // --- Sun color ---
+        var sunCol = lerpC(prevStage.sunColor, stage.sunColor, t);
+        this.sunMesh.material.color.copy(sunCol);
+
+        // --- Sun glow ---
+        this.sunGlow.position.copy(this.sunMesh.position);
+        var glowBreathe = 1 + Math.sin(this.envTime * 0.8 + 1.5) * 0.06;
+        this.sunGlow.scale.setScalar(targetScale * 1.5 * glowBreathe);
+        var glowCol = lerpC(prevStage.glowColor, stage.glowColor, t);
+        this.sunGlow.material.color.copy(glowCol);
+        this.sunGlow.material.opacity = lerpV(prevStage.glowOpacity, stage.glowOpacity, t) * (0.9 + Math.sin(this.envTime * 1.5) * 0.1);
+
+        // --- Sun corona ---
+        this.sunCorona.position.copy(this.sunMesh.position);
+        var coronaBreathe = 1 + Math.sin(this.envTime * 0.5 + 3.0) * 0.08;
+        this.sunCorona.scale.setScalar(targetScale * 2.3 * coronaBreathe);
+        this.sunCorona.material.color.copy(glowCol);
+        this.sunCorona.material.opacity = lerpV(prevStage.glowOpacity, stage.glowOpacity, t) * 0.5 * (0.85 + Math.sin(this.envTime * 0.7 + 2.0) * 0.15);
+
+        // --- God rays ---
+        for (var r = 0; r < this.godRays.length; r++) {
+            var ray = this.godRays[r];
+            ray.position.set(this.sunMesh.position.x, this.sunMesh.position.y - 12, this.sunMesh.position.z);
+            ray.rotation.z = ray.userData.baseRotZ + this.envTime * 0.03 + Math.sin(this.envTime * 0.2 + ray.userData.rayIndex) * 0.1;
+            // Fade rays based on stage (stronger at sunset, weaker at night)
+            var rayBaseOpacity = stageIdx === 2 ? 0.08 : (stageIdx === 3 ? 0.06 : (stageIdx === 4 ? 0.02 : 0.04));
+            ray.material.opacity = rayBaseOpacity * (0.7 + Math.sin(this.envTime * 0.4 + ray.userData.rayIndex * 1.3) * 0.3);
+            ray.material.color.copy(sunCol);
+            ray.scale.setScalar(targetScale);
+        }
+
+        // --- Sky dome ---
+        var skyCol = lerpC(prevStage.skyColor, stage.skyColor, t);
+        // Subtle sky breathing
+        var skyBreath = new THREE.Color(skyCol.r, skyCol.g, skyCol.b);
+        var breathAmt = 0.015;
+        skyBreath.r += Math.sin(this.envTime * 0.3) * breathAmt;
+        skyBreath.g += Math.sin(this.envTime * 0.3 + 1) * breathAmt;
+        skyBreath.b += Math.sin(this.envTime * 0.3 + 2) * breathAmt;
+        this.skyDome.material.color.copy(skyBreath);
+
+        // --- Background & Fog ---
+        var bgCol = lerpC(prevStage.bgColor, stage.bgColor, t);
+        this.scene.background.copy(bgCol);
+        var fogCol = lerpC(prevStage.fogColor, stage.fogColor, t);
+        this.scene.fog.color.copy(fogCol);
+
+        // --- Lights ---
+        if (this.ambientLight) {
+            this.ambientLight.color.copy(lerpC(prevStage.ambientColor, stage.ambientColor, t));
+            this.ambientLight.intensity = lerpV(prevStage.ambientIntensity, stage.ambientIntensity, t);
+        }
+        if (this.sunLight) {
+            this.sunLight.color.copy(lerpC(prevStage.sunLightColor, stage.sunLightColor, t));
+            this.sunLight.intensity = lerpV(prevStage.sunLightIntensity, stage.sunLightIntensity, t);
+            this.sunLight.position.set(targetX, targetY, targetZ);
+        }
+        if (this.fillLight) {
+            this.fillLight.color.copy(lerpC(prevStage.fillColor, stage.fillColor, t));
+            this.fillLight.intensity = lerpV(prevStage.fillIntensity, stage.fillIntensity, t);
+        }
+
+        // --- Mountain tint ---
+        var mtCol = lerpC(prevStage.mountainTint, stage.mountainTint, t);
+        for (var m = 0; m < this.mountainMeshes.length; m++) {
+            var mtn = this.mountainMeshes[m];
+            // Blend base color with stage tint
+            var baseCol = new THREE.Color(mtn.userData.baseColor);
+            var blended = baseCol.lerp(mtCol, 0.5);
+            mtn.material.color.copy(blended);
+            // Subtle heat shimmer on mountains
+            if (stageIdx < 4) {
+                var shimmer = Math.sin(this.envTime * 1.5 + mtn.userData.shimmerOffset) * 0.08;
+                mtn.position.y = mtn.userData.baseY + shimmer;
+            }
+        }
+
+        // Update current wave when transition completes
+        if (this.envTransition >= 1) {
+            this.currentWave = wave;
+        }
     },
 
     createMainStreet: function() {
@@ -533,27 +771,88 @@ const World = {
     },
 
     createMountains: function() {
+        this.mountainMeshes = [];
+
         var mountainPositions = [
-            { x: -60, z: -70, s: 30, h: 20, c: 0x8B7355 },
-            { x: 0, z: -80, s: 40, h: 25, c: 0x9E8B6E },
-            { x: 60, z: -70, s: 35, h: 22, c: 0x8B7355 },
-            { x: -70, z: -50, s: 25, h: 18, c: 0xA0826D },
-            { x: 70, z: -50, s: 25, h: 18, c: 0xA0826D },
-            { x: -50, z: 70, s: 30, h: 15, c: 0x8B7355 },
-            { x: 50, z: 70, s: 30, h: 15, c: 0x9E8B6E },
-            { x: 0, z: 80, s: 35, h: 20, c: 0x8B7355 },
-            { x: -80, z: 0, s: 28, h: 16, c: 0xA0826D },
-            { x: 80, z: 0, s: 28, h: 16, c: 0x9E8B6E },
-            { x: -40, z: -80, s: 20, h: 14, c: 0x8B7355 },
-            { x: 40, z: 80, s: 22, h: 12, c: 0x8B7355 }
+            { x: -60, z: -70, s: 30, h: 20, c: 0x8B7355, snow: true },
+            { x: 0, z: -80, s: 40, h: 28, c: 0x9E8B6E, snow: true },
+            { x: 60, z: -70, s: 35, h: 24, c: 0x8B7355, snow: true },
+            { x: -70, z: -50, s: 25, h: 18, c: 0xA0826D, snow: false },
+            { x: 70, z: -50, s: 25, h: 18, c: 0xA0826D, snow: false },
+            { x: -50, z: 70, s: 30, h: 15, c: 0x8B7355, snow: false },
+            { x: 50, z: 70, s: 30, h: 15, c: 0x9E8B6E, snow: false },
+            { x: 0, z: 80, s: 35, h: 22, c: 0x8B7355, snow: true },
+            { x: -80, z: 0, s: 28, h: 16, c: 0xA0826D, snow: false },
+            { x: 80, z: 0, s: 28, h: 16, c: 0x9E8B6E, snow: false },
+            { x: -40, z: -80, s: 20, h: 14, c: 0x8B7355, snow: false },
+            { x: 40, z: 80, s: 22, h: 12, c: 0x8B7355, snow: false }
         ];
+
         for (var i = 0; i < mountainPositions.length; i++) {
             var mp = mountainPositions[i];
-            var mGeo = new THREE.ConeGeometry(mp.s, mp.h, 5);
-            var mMat = this.mat(mp.c);
+
+            // Main peak - higher poly for smoother silhouette
+            var mGeo = new THREE.ConeGeometry(mp.s, mp.h, 7);
+            var mMat = new THREE.MeshLambertMaterial({ color: mp.c, flatShading: true });
             var mountain = new THREE.Mesh(mGeo, mMat);
-            mountain.position.set(mp.x, mp.h / 2 - 2, mp.z);
+            var baseY = mp.h / 2 - 2;
+            mountain.position.set(mp.x, baseY, mp.z);
+            mountain.userData.baseColor = mp.c;
+            mountain.userData.baseY = baseY;
+            mountain.userData.shimmerOffset = Math.random() * Math.PI * 2;
             this.scene.add(mountain);
+            this.mountainMeshes.push(mountain);
+
+            // Secondary ridge - offset slightly, different height for natural look
+            var ridge1Scale = 0.7 + Math.random() * 0.2;
+            var ridge1H = mp.h * ridge1Scale;
+            var ridge1S = mp.s * (0.6 + Math.random() * 0.2);
+            var ridge1Geo = new THREE.ConeGeometry(ridge1S, ridge1H, 6);
+            var ridge1Color = mp.c + 0x111111; // slightly lighter
+            var ridge1Mat = new THREE.MeshLambertMaterial({ color: ridge1Color, flatShading: true });
+            var ridge1 = new THREE.Mesh(ridge1Geo, ridge1Mat);
+            var r1x = mp.x + mp.s * 0.35 * (Math.random() > 0.5 ? 1 : -1);
+            var r1z = mp.z + mp.s * 0.15 * (Math.random() > 0.5 ? 1 : -1);
+            var r1baseY = ridge1H / 2 - 2;
+            ridge1.position.set(r1x, r1baseY, r1z);
+            ridge1.userData.baseColor = ridge1Color;
+            ridge1.userData.baseY = r1baseY;
+            ridge1.userData.shimmerOffset = Math.random() * Math.PI * 2;
+            this.scene.add(ridge1);
+            this.mountainMeshes.push(ridge1);
+
+            // Tertiary foothill - smaller, in front
+            var footH = mp.h * (0.35 + Math.random() * 0.15);
+            var footS = mp.s * (0.5 + Math.random() * 0.15);
+            var footColor = mp.c - 0x080808; // slightly darker
+            var footGeo = new THREE.ConeGeometry(footS, footH, 5);
+            var footMat = new THREE.MeshLambertMaterial({ color: footColor, flatShading: true });
+            var foot = new THREE.Mesh(footGeo, footMat);
+            var fx = mp.x + mp.s * 0.2 * (Math.random() > 0.5 ? 1 : -1);
+            var fz = mp.z + mp.s * 0.3;
+            var fbaseY = footH / 2 - 2;
+            foot.position.set(fx, fbaseY, fz);
+            foot.userData.baseColor = footColor;
+            foot.userData.baseY = fbaseY;
+            foot.userData.shimmerOffset = Math.random() * Math.PI * 2;
+            this.scene.add(foot);
+            this.mountainMeshes.push(foot);
+
+            // Snow cap on tall mountains
+            if (mp.snow) {
+                var snowH = mp.h * 0.25;
+                var snowS = mp.s * 0.22;
+                var snowGeo = new THREE.ConeGeometry(snowS, snowH, 7);
+                var snowMat = new THREE.MeshLambertMaterial({ color: 0xEEEEEE, flatShading: true });
+                var snow = new THREE.Mesh(snowGeo, snowMat);
+                var snowBaseY = baseY + mp.h * 0.38;
+                snow.position.set(mp.x, snowBaseY, mp.z);
+                snow.userData.baseColor = 0xEEEEEE;
+                snow.userData.baseY = snowBaseY;
+                snow.userData.shimmerOffset = Math.random() * Math.PI * 2;
+                this.scene.add(snow);
+                this.mountainMeshes.push(snow);
+            }
         }
 
         // Cacti - more spread around

@@ -43,12 +43,13 @@ const Game = {
         this.renderer.shadowMap.type = THREE.BasicShadowMap;
         this.renderer.setScissorTest(true);
 
-        // Lighting
+        // Lighting - store references in World for environment evolution
         var ambient = new THREE.AmbientLight(0xDEB887, 0.6);
         this.scene.add(ambient);
+        World.ambientLight = ambient;
 
         var sun = new THREE.DirectionalLight(0xFFE4B5, 0.8);
-        sun.position.set(30, 50, -40);
+        sun.position.set(30, 55, -40);
         sun.castShadow = true;
         sun.shadow.mapSize.width = 512;
         sun.shadow.mapSize.height = 512;
@@ -59,10 +60,12 @@ const Game = {
         sun.shadow.camera.top = 50;
         sun.shadow.camera.bottom = -50;
         this.scene.add(sun);
+        World.sunLight = sun;
 
         var fill = new THREE.DirectionalLight(0xFFAA66, 0.3);
         fill.position.set(-20, 20, 30);
         this.scene.add(fill);
+        World.fillLight = fill;
 
         this.clock = new THREE.Clock();
         World.build(this.scene);
@@ -176,6 +179,11 @@ const Game = {
         this.isRunning = true;
         this.state = 'playing';
 
+        // Reset environment to High Noon for wave 1
+        World.currentWave = 1;
+        World.targetWave = 1;
+        World.envTransition = 1;
+
         HUD.show();
         HUD.updateScore(0);
         HUD.updateWave(1);
@@ -218,6 +226,9 @@ const Game = {
         HUD.showWaveBanner(this.wave);
         HUD.updateWave(this.wave);
         AudioManager.playWaveStart();
+
+        // Trigger sun/sky/mountain evolution for this wave
+        World.setTargetWave(this.wave);
 
         var self = this;
         setTimeout(function() { Enemies.spawnWave(enemyCount); }, 1500);
@@ -304,6 +315,9 @@ const Game = {
                 self.waveTimer = 0;
             }
         }
+
+        // Update sun/sky/mountain environment evolution
+        World.updateEnvironment(self.wave, delta);
 
         self.updateDust(delta);
         self.updateTumbleweeds(delta);

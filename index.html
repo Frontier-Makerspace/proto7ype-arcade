@@ -254,6 +254,38 @@ html,body{
   box-shadow:0 0 30px rgba(205,133,63,0.6);
 }
 
+/* Special Klaus cartridge styling */
+.cartridge-klaus{
+  background:linear-gradient(135deg,#0a1a00 0%,#1a3a0a 50%,#228B22 100%);
+  border-color:#90EE90;
+  animation:klausPulse 3s ease-in-out infinite;
+  box-shadow:0 0 20px rgba(144,238,144,0.5);
+}
+@keyframes klausPulse{
+  0%,100%{border-color:#90EE90;box-shadow:0 0 20px rgba(144,238,144,0.5);}
+  50%{border-color:#228B22;box-shadow:0 0 40px rgba(34,139,34,0.7);}
+}
+.cartridge-klaus .cartridge-label{
+  color:#90EE90;
+  text-shadow:0 0 10px #228B22,0 0 20px #90EE90;
+  font-weight:900;
+}
+.cartridge-klaus.selected{
+  border-color:#90EE90;
+  border-width:5px;
+  box-shadow:0 0 50px rgba(144,238,144,0.8),inset 0 0 40px rgba(34,139,34,0.3);
+  transform:translateX(25px);
+  background:linear-gradient(135deg,#1a3a0a 0%,#2a5a1a 50%,#90EE90 100%);
+}
+.cartridge-klaus.selected .cartridge-label{
+  color:#90EE90;
+  text-shadow:0 0 20px #90EE90,0 0 40px #228B22;
+}
+.cartridge-klaus:hover:not(.selected){
+  border-color:#228B22;
+  box-shadow:0 0 30px rgba(34,139,34,0.6);
+}
+
 .crt-container{
   flex:1;
   display:flex;flex-direction:column;
@@ -470,6 +502,10 @@ html,body{
       <div class="cartridge-label">HIGH NOON</div>
       <span class="player-badge">2P</span>
     </div>
+    <div class="cartridge cartridge-klaus" data-game="11">
+      <span class="cart-icon">🐈‍⬛</span>
+      <div class="cartridge-label">KLAUS!</div>
+    </div>
   </div>
 
   <div class="crt-container">
@@ -583,6 +619,16 @@ html,body{
           </div>
           <div class="preview-multiplayer">⚡ 2-PLAYER CO-OP SPLIT-SCREEN ⚡</div>
         </div>
+
+        <div class="game-preview" id="preview11">
+          <div class="preview-icon" style="color:#90EE90">🐈‍⬛</div>
+          <div class="preview-title" style="color:#90EE90;text-shadow:0 0 40px #228B22;">KLAUS!</div>
+          <div class="preview-desc">
+            3rd-person cat adventure! Play as Klaus, a large black cat exploring a cute 3D world.
+            Walk through grass, chase butterflies, and discover yarn balls, fish toys, and mushrooms.
+            <span style="color:#90EE90;font-weight:bold;">A chill exploration game. No enemies. Just vibes.</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -594,7 +640,7 @@ html,body{
 
 <script>
 let selectedGame = 0;
-const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html', 'cline-defenders.html', 'beat-protocol.html', 'dread.html', 'shell-game.html', 'high-noon.html'];
+const games = ['arc-bundas.html', 'vibe-knights.html', 'blackjack.html', 'cyber-drive.html', 'ufb.html', 'neon-serpent.html', 'cline-defenders.html', 'beat-protocol.html', 'dread.html', 'shell-game.html', 'high-noon.html', 'klaus.html'];
 const cartridges = document.querySelectorAll('.cartridge');
 const previews = document.querySelectorAll('.game-preview');
 

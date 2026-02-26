@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SOUL CUPS - Horror Shell Game</title>
+<style>
+:root{
+  --blood:#8B0000;--crimson:#FF0000;--dark:#0A0000;--void:#050000;
+  --bone:#3A1515;--flesh:#660000;--ember:#FF4400;
+  --ease-out:cubic-bezier(0.0,0.0,0.2,1);
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+html,body{margin:0;padding:0;background:#000;overflow:hidden;font-family:'Courier New',monospace;height:100vh;}
+#gameContainer{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;position:relative;}
+canvas{border:3px solid var(--blood);border-radius:4px;box-shadow:0 0 60px rgba(139,0,0,0.4),0 0 120px rgba(139,0,0,0.15);background:#000;}
+#overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:900px;height:700px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,0,0,0.97);border-radius:4px;text-align:center;z-index:50;border:1px solid rgba(139,0,0,0.3);}
+.title{font-size:80px;color:var(--blood);text-shadow:0 0 60px var(--crimson),0 0 120px rgba(139,0,0,0.5);margin-bottom:24px;text-transform:uppercase;font-weight:900;letter-spacing:12px;animation:titleBreath 4s ease-in-out infinite;}
+@keyframes titleBreath{0%,100%{opacity:0.85;text-shadow:0 0 40px var(--crimson),0 0 80px rgba(139,0,0,0.4);}50%{opacity:1;text-shadow:0 0 80px var(--crimson),0 0 160px rgba(139,0,0,0.6);}}
+.subtitle{font-size:18px;color:var(--flesh);margin-bottom:32px;letter-spacing:4px;opacity:0.7;}
+.instructions{color:#555;font-size:14px;line-height:2.2;margin-bottom:32px;padding:24px 32px;border-radius:4px;border:1px solid rgba(139,0,0,0.15);background:rgba(0,0,0,0.4);max-width:500px;}
+.instructions strong{color:var(--crimson);font-weight:700;}
+.startBtn{padding:16px 48px;background:transparent;color:var(--blood);border:2px solid var(--blood);border-radius:4px;font-size:18px;font-weight:700;cursor:pointer;letter-spacing:3px;font-family:'Courier New',monospace;transition:all 300ms var(--ease-out);text-transform:uppercase;}
+.startBtn:hover{background:var(--blood);color:#fff;box-shadow:0 0 40px rgba(139,0,0,0.6);transform:translateY(-2px);}
+.startBtn:active{transform:translateY(0);}
+.controls-hint{color:#333;font-size:12px;margin-top:16px;letter-spacing:1px;}
+.scanline{position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.15),rgba(0,0,0,0.15) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:1000;}
+#hud{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:48px;font-size:16px;font-weight:700;z-index:40;pointer-events:none;letter-spacing:2px;}
+.hud-score{color:var(--crimson);text-shadow:0 0 20px rgba(255,0,0,0.5);}
+.hud-round{color:var(--blood);text-shadow:0 0 15px rgba(139,0,0,0.5);}
+.hud-best{color:var(--flesh);text-shadow:0 0 10px rgba(102,0,0,0.5);}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}}
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+<div id="gameContainer">
+  <canvas id="canvas" width="900" height="700"></canvas>
+  <div id="overlay">
+    <div class="title">SOUL CUPS</div>
+    <div class="subtitle">FIND THE SOUL — OR LOSE YOURS</div>
+    <div class="instructions">
+      <strong>THE RITUAL</strong><br><br>
+      A damned soul hides beneath one of three cursed chalices.<br>
+      Watch closely as they shuffle. Then choose wisely.<br><br>
+      <strong>CONTROLS</strong><br>
+      Left / Right — Select &nbsp;&nbsp; Enter — Confirm<br><br>
+      <strong style="color:#FF0000;">Choose wrong and you die.</strong>
+    </div>
+    <div class="startBtn" id="startBtn">BEGIN THE RITUAL</div>
+    <div class="controls-hint">ESC or COIN to return to menu</div>
+  </div>
+</div>
+<script>
+const C=document.getElementById('canvas'),X=C.getContext('2d'),OV=document.getElementById('overlay');
+const W=900,H=700;
+let S='menu',score=0,round=1,hi=+localStorage.getItem('soulCupsHigh')||0,F=0;
+
+// --- CUPS ---
+const CW=130,CH=170,CY=300,CP=[180,380,580];
+let cups=[{x:CP[0],ball:false},{x:CP[1],ball:true},{x:CP[2],ball:false}];
+let lift=0,liftT=0,sel=1;
+let sQ=[],sSpd=400,swP=0,swA=-1,swB=-1,swOn=false,swAX=0,swBX=0;
+
+// --- PARTICLES ---
+let embers=[],fog=[],blood=[],sparks=[],candles=[],smoke=[],eyes=[];
+let heartbeat=0,hbDir=1;
+let swapYA=0,swapYB=0; // vertical arc offsets
+
+// --- DEATH ---
+let dT=0,dPh=0,shake=0,bAlpha=0;
+const DMSG=["YOUR SOUL IS CONSUMED","THE DARKNESS DEVOURS YOU","FLESH TORN FROM BONE",
+"YOUR SCREAMS ECHO FOREVER","BLOOD FOR THE CHALICE","THE VOID CLAIMS ANOTHER",
+"YOUR EYES MELT FROM THEIR SOCKETS","BONES SHATTER LIKE GLASS"];
+let dMsg="";
+
+// --- CORRECT ---
+let cT=0;
+const CMSG=["THE SPIRITS SPARE YOU... FOR NOW","YOU LIVE... BUT FOR HOW LONG?",
+"LUCKY... THIS TIME","THE DARKNESS WATCHES... WAITING","YOUR SOUL REMAINS... BARELY"];
+let cMsg="";
+
+// --- HUD ---
+let hud=null;
+
+// --- AMBIENT SETUP ---
+function initAmbient(){
+  embers=[];fog=[];candles=[];
+  for(let i=0;i<40;i++) embers.push({x:Math.random()*W,y:Math.random()*H,
+    vx:(Math.random()-0.5)*0.2,vy:-Math.random()*0.4-0.15,
+    sz:Math.random()*2.5+0.5,a:Math.random()*0.4+0.1,life:Math.random()*300+150,
+    hue:Math.random()*30});
+  for(let i=0;i<12;i++) fog.push({x:Math.random()*W,y:H*0.5+Math.random()*H*0.5,
+    w:Math.random()*300+200,h:Math.random()*60+30,
+    vx:(Math.random()-0.5)*0.3,a:Math.random()*0.04+0.01,phase:Math.random()*Math.PI*2});
+  // Candles flanking the cups
+  candles=[{x:60,y:CY+CH-20},{x:W-60,y:CY+CH-20},{x:W/2,y:CY-80}];
+  // Watching eyes in the darkness
+  eyes=[];
+  for(let i=0;i<6;i++) eyes.push({x:Math.random()*W,y:40+Math.random()*180,
+    sz:Math.random()*3+2,blink:Math.random()*400+200,timer:Math.random()*300,
+    open:true,drift:Math.random()*0.1-0.05});
+  // Smoke wisps from cups
+  smoke=[];
+}
+
+// --- DRAW: BACKGROUND ---
+function drawBG(){
+  const g=X.createRadialGradient(W/2,H*0.45,30,W/2,H*0.45,550);
+  g.addColorStop(0,'#120303');g.addColorStop(0.6,'#080101');g.addColorStop(1,'#020000');
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+
+  // Rotating pentagram
+  X.save();
+  X.translate(W/2,H*0.52);
+  X.rotate(F*0.001);
+  X.globalAlpha=0.025+Math.sin(F*0.008)*0.012;
+  X.strokeStyle='#8B0000';X.lineWidth=1.5;
+  X.beginPath();
+  for(let i=0;i<5;i++){const a=-Math.PI/2+(i*4*Math.PI/5),px=Math.cos(a)*210,py=Math.sin(a)*210;
+    i===0?X.moveTo(px,py):X.lineTo(px,py);}
+  X.closePath();X.stroke();
+  X.beginPath();X.arc(0,0,210,0,Math.PI*2);X.stroke();
+  // Inner circle
+  X.beginPath();X.arc(0,0,130,0,Math.PI*2);X.stroke();
+  // Runes around circle
+  X.globalAlpha=0.03+Math.sin(F*0.005)*0.015;
+  X.font='14px serif';X.fillStyle='#8B0000';X.textAlign='center';
+  const runes='ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+  for(let i=0;i<24;i++){const a=(i/24)*Math.PI*2,rx=Math.cos(a)*240,ry=Math.sin(a)*240;
+    X.fillText(runes[i],rx,ry);}
+  X.restore();
+
+  // Table surface with wood grain hint
+  X.save();
+  const tY=CY+CH+25;
+  const tG=X.createLinearGradient(0,tY,0,H);
+  tG.addColorStop(0,'#140606');tG.addColorStop(0.3,'#0E0303');tG.addColorStop(1,'#060101');
+  X.fillStyle=tG;X.fillRect(0,tY,W,H-tY);
+  // Table edge highlight
+  X.strokeStyle='rgba(60,20,20,0.6)';X.lineWidth=1;
+  X.beginPath();X.moveTo(0,tY);X.lineTo(W,tY);X.stroke();
+  X.strokeStyle='rgba(30,8,8,0.4)';
+  X.beginPath();X.moveTo(0,tY+2);X.lineTo(W,tY+2);X.stroke();
+  X.restore();
+}
+
+// --- DRAW: FOG ---
+function drawFog(){
+  fog.forEach(f=>{
+    f.x+=f.vx;f.phase+=0.008;
+    if(f.x>W+200)f.x=-f.w;if(f.x<-f.w)f.x=W+200;
+    const a=f.a*(0.7+Math.sin(f.phase)*0.3);
+    X.save();X.globalAlpha=a;
+    const g=X.createRadialGradient(f.x,f.y,0,f.x,f.y,f.w/2);
+    g.addColorStop(0,'rgba(40,5,5,0.3)');g.addColorStop(1,'rgba(20,2,2,0)');
+    X.fillStyle=g;X.fillRect(f.x-f.w/2,f.y-f.h/2,f.w,f.h);
+    X.restore();
+  });
+}
+
+// --- DRAW: EMBERS ---
+function drawEmbers(){
+  embers.forEach(e=>{
+    e.x+=e.vx+Math.sin(F*0.02+e.hue)*0.15;e.y+=e.vy;e.life--;
+    if(e.life<=0||e.y<-10){e.x=Math.random()*W;e.y=H+10;e.life=Math.random()*300+150;e.a=Math.random()*0.4+0.1;}
+    X.save();
+    const al=e.a*Math.min(1,e.life/80);
+    X.globalAlpha=al;
+    X.fillStyle=`hsl(${15+e.hue},100%,${50+Math.sin(F*0.1+e.hue)*15}%)`;
+    X.shadowBlur=6;X.shadowColor='#FF3300';
+    X.beginPath();X.arc(e.x,e.y,e.sz,0,Math.PI*2);X.fill();
+    X.restore();
+  });
+}
+
+// --- DRAW: CANDLES ---
+function drawCandles(){
+  candles.forEach(c=>{
+    const flk=Math.sin(F*0.15+c.x)*3+Math.sin(F*0.23+c.x*0.5)*2;
+    const fy=c.y-25+flk;
+    // Candle body
+    X.save();
+    X.fillStyle='#1A0808';
+    X.fillRect(c.x-4,c.y-15,8,35);
+    X.strokeStyle='#2A1010';X.lineWidth=1;
+    X.strokeRect(c.x-4,c.y-15,8,35);
+    // Flame
+    const fG=X.createRadialGradient(c.x,fy,1,c.x,fy,12);
+    fG.addColorStop(0,'rgba(255,200,50,0.9)');fG.addColorStop(0.3,'rgba(255,100,0,0.6)');
+    fG.addColorStop(0.7,'rgba(200,30,0,0.2)');fG.addColorStop(1,'rgba(139,0,0,0)');
+    X.fillStyle=fG;X.beginPath();X.arc(c.x,fy,12,0,Math.PI*2);X.fill();
+    // Flame core
+    X.fillStyle='rgba(255,255,200,0.8)';
+    X.beginPath();X.arc(c.x,fy+1,3,0,Math.PI*2);X.fill();
+    // Light pool on table
+    X.globalAlpha=0.03+Math.sin(F*0.1+c.x)*0.01;
+    const lG=X.createRadialGradient(c.x,c.y+20,5,c.x,c.y+20,80);
+    lG.addColorStop(0,'rgba(255,100,20,0.15)');lG.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=lG;X.fillRect(c.x-80,c.y-40,160,120);
+    X.restore();
+  });
+}
+
+// --- DRAW: VIGNETTE ---
+function drawVignette(intensity){
+  X.save();
+  const g=X.createRadialGradient(W/2,H/2,W*0.25,W/2,H/2,W*0.6);
+  g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(0,0,0,${0.5+intensity*0.3})`);
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+  X.restore();
+}
+
+// --- DRAW: NOISE ---
+function drawNoise(){
+  X.save();X.globalAlpha=0.015;
+  for(let i=0;i<60;i++){
+    const nx=Math.random()*W,ny=Math.random()*H,ns=Math.random()*3+1;
+    X.fillStyle=Math.random()>0.5?'#1A0505':'#000';
+    X.fillRect(nx,ny,ns,ns);
+  }
+  X.restore();
+}
+
+// --- DRAW: WATCHING EYES ---
+function drawEyes(){
+  const intensity=Math.min(round*0.08,0.5);
+  eyes.forEach(e=>{
+    e.timer++;e.x+=e.drift;
+    if(e.x<20)e.drift=Math.abs(e.drift);if(e.x>W-20)e.drift=-Math.abs(e.drift);
+    if(e.timer>e.blink){e.open=!e.open;e.timer=0;e.blink=e.open?Math.random()*400+200:Math.random()*20+5;}
+    if(!e.open)return;
+    const a=0.04+intensity+Math.sin(F*0.03+e.x)*0.02;
+    X.save();X.globalAlpha=a;
+    // Left eye
+    X.fillStyle='#FF0000';X.shadowBlur=8;X.shadowColor='#FF0000';
+    X.beginPath();X.ellipse(e.x-e.sz*1.5,e.y,e.sz,e.sz*0.6,0,0,Math.PI*2);X.fill();
+    // Right eye
+    X.beginPath();X.ellipse(e.x+e.sz*1.5,e.y,e.sz,e.sz*0.6,0,0,Math.PI*2);X.fill();
+    // Pupils
+    X.fillStyle='#000';X.shadowBlur=0;
+    X.beginPath();X.arc(e.x-e.sz*1.5,e.y,e.sz*0.3,0,Math.PI*2);X.fill();
+    X.beginPath();X.arc(e.x+e.sz*1.5,e.y,e.sz*0.3,0,Math.PI*2);X.fill();
+    X.restore();
+  });
+}
+
+// --- DRAW: SMOKE WISPS ---
+function drawSmoke(){
+  // Spawn smoke from cup rims when not lifted
+  if(S!=='death'&&S!=='gameover'&&lift<0.1&&F%6===0){
+    cups.forEach(c=>{
+      smoke.push({x:c.x+(Math.random()-0.5)*20,y:CY-5,
+        vx:(Math.random()-0.5)*0.3,vy:-Math.random()*0.8-0.3,
+        sz:Math.random()*8+4,a:Math.random()*0.06+0.02,life:80+Math.random()*60});
+    });
+  }
+  smoke=smoke.filter(s=>s.life>0);
+  smoke.forEach(s=>{
+    s.x+=s.vx+Math.sin(F*0.02+s.x*0.01)*0.3;s.y+=s.vy;s.sz+=0.05;s.life--;
+    X.save();X.globalAlpha=s.a*(s.life/100);
+    const g=X.createRadialGradient(s.x,s.y,0,s.x,s.y,s.sz);
+    g.addColorStop(0,'rgba(30,5,5,0.3)');g.addColorStop(1,'rgba(10,2,2,0)');
+    X.fillStyle=g;X.beginPath();X.arc(s.x,s.y,s.sz,0,Math.PI*2);X.fill();
+    X.restore();
+  });
+}
+
+// --- DRAW: HEARTBEAT VIGNETTE ---
+function drawHeartbeat(){
+  heartbeat+=0.04*hbDir;
+  if(heartbeat>1){hbDir=-1;}if(heartbeat<0){hbDir=1;heartbeat=0;}
+  const hbCurve=Math.pow(Math.sin(heartbeat*Math.PI),3);
+  const intensity=hbCurve*0.08*Math.min(round,6);
+  if(intensity<0.005)return;
+  X.save();X.globalAlpha=intensity;
+  X.fillStyle='#2A0000';X.fillRect(0,0,W,H);
+  // Red edge pulse
+  const g=X.createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.55);
+  g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(139,0,0,0.4)');
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+  X.restore();
+}
+
+// --- DRAW: SKULL FLASH (death phase 1) ---
+function drawSkullFlash(alpha){
+  X.save();X.globalAlpha=alpha;
+  X.strokeStyle='#FF0000';X.lineWidth=3;X.shadowBlur=40;X.shadowColor='#FF0000';
+  const cx=W/2,cy=H/2,s=120;
+  // Giant skull
+  X.beginPath();X.arc(cx,cy-s*0.1,s,0,Math.PI*2);X.stroke();
+  // Eyes
+  X.fillStyle='#FF0000';
+  X.beginPath();X.arc(cx-s*0.35,cy-s*0.15,s*0.22,0,Math.PI*2);X.fill();
+  X.beginPath();X.arc(cx+s*0.35,cy-s*0.15,s*0.22,0,Math.PI*2);X.fill();
+  // Dark pupils
+  X.fillStyle='#000';
+  X.beginPath();X.arc(cx-s*0.35,cy-s*0.15,s*0.1,0,Math.PI*2);X.fill();
+  X.beginPath();X.arc(cx+s*0.35,cy-s*0.15,s*0.1,0,Math.PI*2);X.fill();
+  // Nose
+  X.strokeStyle='#FF0000';X.lineWidth=2;
+  X.beginPath();X.moveTo(cx,cy+s*0.1);X.lineTo(cx-s*0.12,cy+s*0.3);X.lineTo(cx+s*0.12,cy+s*0.3);X.closePath();X.stroke();
+  // Jaw
+  X.beginPath();X.moveTo(cx-s*0.4,cy+s*0.5);X.lineTo(cx+s*0.4,cy+s*0.5);X.stroke();
+  // Teeth
+  for(let t=0;t<7;t++){const tx=cx-s*0.35+t*s*0.12;
+    X.beginPath();X.moveTo(tx,cy+s*0.42);X.lineTo(tx,cy+s*0.58);X.stroke();}
+  X.restore();
+}
+
+// --- DRAW: SCREEN CRACKS (death) ---
+function drawCracks(alpha){
+  X.save();X.globalAlpha=alpha;X.strokeStyle='#FF0000';X.lineWidth=1.5;X.shadowBlur=3;X.shadowColor='#FF0000';
+  // Pre-defined crack paths from center
+  const cracks=[[W/2,H/2,W*0.1,H*0.05,W*0.3,-H*0.15,W*0.5,-H*0.3],
+    [W/2,H/2,-W*0.08,H*0.1,-W*0.25,H*0.2,-W*0.4,H*0.35],
+    [W/2,H/2,W*0.05,-H*0.12,W*0.15,-H*0.25,-W*0.1,-H*0.4],
+    [W/2,H/2,-W*0.12,-H*0.05,-W*0.3,-H*0.15,-W*0.45,H*0.1],
+    [W/2,H/2,W*0.15,H*0.08,W*0.35,H*0.2,W*0.4,H*0.4]];
+  cracks.forEach(c=>{
+    X.beginPath();X.moveTo(c[0],c[1]);
+    for(let i=2;i<c.length;i+=2)X.lineTo(c[0]+c[i],c[1]+c[i+1]);
+    X.stroke();
+  });
+  X.restore();
+}
+
+// --- DRAW: CUP (chalice with craft) ---
+function drawCup(cx,cy,isSel,lft,idx){
+  const lo=lft*130;const dy=cy-lo;
+  X.save();
+  // Shadow on table
+  X.globalAlpha=0.4*(1-lft*0.5);
+  X.fillStyle='#000';
+  X.beginPath();X.ellipse(cx,cy+CH/2+8,CW/2-15,12-lft*6,0,0,Math.PI*2);X.fill();
+  X.globalAlpha=1;
+
+  // Cup body gradient
+  const bG=X.createLinearGradient(cx-CW/2,dy,cx+CW/2,dy);
+  bG.addColorStop(0,'#0E0404');bG.addColorStop(0.2,'#2A0E0E');bG.addColorStop(0.4,'#3D1616');
+  bG.addColorStop(0.5,'#451A1A');bG.addColorStop(0.6,'#3D1616');bG.addColorStop(0.8,'#2A0E0E');bG.addColorStop(1,'#0E0404');
+
+  // Main body (bell shape via bezier)
+  X.fillStyle=bG;X.beginPath();
+  X.moveTo(cx-CW*0.35,dy);
+  X.bezierCurveTo(cx-CW*0.42,dy+CH*0.3,cx-CW*0.5,dy+CH*0.7,cx-CW*0.5,dy+CH);
+  X.lineTo(cx+CW*0.5,dy+CH);
+  X.bezierCurveTo(cx+CW*0.5,dy+CH*0.7,cx+CW*0.42,dy+CH*0.3,cx+CW*0.35,dy);
+  X.closePath();X.fill();
+
+  // Rim top ellipse
+  X.fillStyle='#2A0E0E';
+  X.beginPath();X.ellipse(cx,dy,CW*0.35,8,0,0,Math.PI*2);X.fill();
+
+  // Rim highlight
+  X.strokeStyle=isSel?'rgba(255,0,0,0.8)':'rgba(100,20,20,0.5)';
+  X.lineWidth=isSel?2.5:1;
+  if(isSel){X.shadowBlur=25;X.shadowColor='#FF0000';}
+  X.beginPath();X.ellipse(cx,dy,CW*0.35,8,0,0,Math.PI*2);X.stroke();
+  X.shadowBlur=0;
+
+  // Body outline
+  X.strokeStyle=isSel?'rgba(255,0,0,0.4)':'rgba(80,20,20,0.3)';
+  X.lineWidth=1;
+  X.beginPath();
+  X.moveTo(cx-CW*0.35,dy);
+  X.bezierCurveTo(cx-CW*0.42,dy+CH*0.3,cx-CW*0.5,dy+CH*0.7,cx-CW*0.5,dy+CH);
+  X.lineTo(cx+CW*0.5,dy+CH);
+  X.bezierCurveTo(cx+CW*0.5,dy+CH*0.7,cx+CW*0.42,dy+CH*0.3,cx+CW*0.35,dy);
+  X.stroke();
+
+  // Decorative bands
+  for(let b=0;b<3;b++){
+    const by=dy+CH*0.25+b*CH*0.22;
+    X.strokeStyle=`rgba(80,20,20,${0.15+b*0.05})`;X.lineWidth=0.5;
+    const bw=CW*0.35+b*CW*0.05;
+    X.beginPath();X.moveTo(cx-bw,by);X.lineTo(cx+bw,by);X.stroke();
+  }
+
+  // Skull etching (drawn, not emoji)
+  const skA=isSel?0.5:0.2;
+  X.globalAlpha=skA;X.strokeStyle=isSel?'#FF0000':'#660000';X.lineWidth=1.5;
+  const skY=dy+CH*0.45,skS=18;
+  // Skull outline
+  X.beginPath();X.arc(cx,skY-skS*0.1,skS,0,Math.PI*2);X.stroke();
+  // Eyes
+  X.beginPath();X.arc(cx-skS*0.35,skY-skS*0.15,skS*0.2,0,Math.PI*2);X.stroke();
+  X.beginPath();X.arc(cx+skS*0.35,skY-skS*0.15,skS*0.2,0,Math.PI*2);X.stroke();
+  // Nose
+  X.beginPath();X.moveTo(cx,skY+skS*0.05);X.lineTo(cx-skS*0.1,skY+skS*0.25);X.lineTo(cx+skS*0.1,skY+skS*0.25);X.closePath();X.stroke();
+  // Jaw
+  X.beginPath();X.moveTo(cx-skS*0.3,skY+skS*0.4);X.lineTo(cx+skS*0.3,skY+skS*0.4);X.stroke();
+  for(let t=0;t<4;t++){const tx=cx-skS*0.2+t*skS*0.13;
+    X.beginPath();X.moveTo(tx,skY+skS*0.35);X.lineTo(tx,skY+skS*0.5);X.stroke();}
+  X.globalAlpha=1;
+
+  // Selection indicator
+  if(isSel&&S==='choose'){
+    const pulse=Math.sin(F*0.08)*0.3+0.7;
+    X.save();X.globalAlpha=pulse;
+    X.fillStyle='#FF0000';X.shadowBlur=20;X.shadowColor='#FF0000';
+    // Arrow
+    X.beginPath();X.moveTo(cx,dy-30);X.lineTo(cx-10,dy-45);X.lineTo(cx+10,dy-45);X.closePath();X.fill();
+    // Glow ring under cup
+    X.strokeStyle='rgba(255,0,0,0.3)';X.lineWidth=2;
+    X.beginPath();X.ellipse(cx,cy+CH/2+8,CW/2,10,0,0,Math.PI*2);X.stroke();
+    X.restore();
+  }
+  X.restore();
+}
+
+// --- DRAW: SOUL ORB ---
+function drawBall(bx,by){
+  X.save();
+  const p=Math.sin(F*0.06)*0.3+0.7;
+  // Outer aura
+  X.globalAlpha=0.3*p;
+  const a1=X.createRadialGradient(bx,by,5,bx,by,45);
+  a1.addColorStop(0,'rgba(255,50,0,0.4)');a1.addColorStop(1,'rgba(139,0,0,0)');
+  X.fillStyle=a1;X.beginPath();X.arc(bx,by,45,0,Math.PI*2);X.fill();
+  // Mid glow
+  X.globalAlpha=0.6*p;
+  const a2=X.createRadialGradient(bx,by,3,bx,by,22);
+  a2.addColorStop(0,'rgba(255,80,20,0.8)');a2.addColorStop(0.5,'rgba(200,0,0,0.4)');a2.addColorStop(1,'rgba(139,0,0,0)');
+  X.fillStyle=a2;X.beginPath();X.arc(bx,by,22,0,Math.PI*2);X.fill();
+  // Core
+  X.globalAlpha=1;
+  X.shadowBlur=20*p;X.shadowColor='#FF0000';
+  const core=X.createRadialGradient(bx-2,by-2,1,bx,by,12);
+  core.addColorStop(0,'#FFCCAA');core.addColorStop(0.3,'#FF4400');core.addColorStop(0.7,'#CC0000');core.addColorStop(1,'#660000');
+  X.fillStyle=core;X.beginPath();X.arc(bx,by,12,0,Math.PI*2);X.fill();
+  // Specular
+  X.fillStyle='rgba(255,220,180,0.6)';
+  X.beginPath();X.arc(bx-3,by-4,3,0,Math.PI*2);X.fill();
+  X.restore();
+}
+
+// --- PARTICLES ---
+function drawSparks(){
+  sparks=sparks.filter(p=>p.life>0);
+  sparks.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.08;p.life--;
+    X.save();X.globalAlpha=Math.min(1,p.life/40);
+    X.fillStyle=p.c;X.shadowBlur=4;X.shadowColor=p.c;
+    X.beginPath();X.arc(p.x,p.y,p.sz*(p.life/p.ml),0,Math.PI*2);X.fill();
+    X.restore();});
+}
+function drawBlood(){
+  blood=blood.filter(b=>b.life>0);
+  blood.forEach(b=>{b.x+=b.vx;b.y+=b.vy;b.vy+=0.12;b.vx*=0.98;b.life--;
+    X.save();X.globalAlpha=Math.min(1,b.life/50);
+    X.fillStyle='#6B0000';X.shadowBlur=3;X.shadowColor='#FF0000';
+    X.beginPath();X.arc(b.x,b.y,b.sz,0,Math.PI*2);X.fill();
+    X.restore();});
+}
+function spawnSparks(sx,sy,n,col){
+  for(let i=0;i<n;i++){const ml=40+Math.random()*40;
+    sparks.push({x:sx,y:sy,vx:(Math.random()-0.5)*5,vy:-Math.random()*6-1,
+      sz:Math.random()*3+1,c:col,life:ml,ml});}
+}
+function spawnBlood(sx,sy,n){
+  for(let i=0;i<n;i++) blood.push({x:sx,y:sy,vx:(Math.random()-0.5)*14,
+    vy:(Math.random()-0.5)*14,sz:Math.random()*7+2,life:100+Math.random()*60});
+}
+
+// --- GAME LOGIC ---
+function resetCups(){
+  const b=Math.floor(Math.random()*3);
+  cups=[{x:CP[0],ball:b===0},{x:CP[1],ball:b===1},{x:CP[2],ball:b===2}];sel=1;
+}
+function updateHUD(){
+  document.getElementById('sV').textContent=score;
+  document.getElementById('rV').textContent=round;
+  document.getElementById('bV').textContent=hi;
+}
+function startGame(){
+  S='reveal';score=0;round=1;blood=[];sparks=[];
+  OV.style.display='none';hud.style.display='flex';
+  updateHUD();resetCups();lift=0;liftT=1;
+  setTimeout(()=>{liftT=0;setTimeout(()=>beginShuffle(),700);},1800);
+}
+function beginShuffle(){
+  S='shuffle';sQ=[];
+  const n=Math.min(3+round,15);sSpd=Math.max(120,380-round*28);
+  for(let i=0;i<n;i++){let a=Math.floor(Math.random()*3),b;
+    do{b=Math.floor(Math.random()*3);}while(b===a);sQ.push([a,b]);}
+  doSwap();
+}
+function doSwap(){
+  if(!sQ.length){S='choose';sel=1;return;}
+  const[a,b]=sQ.shift();swA=a;swB=b;swP=0;swOn=true;
+  swAX=cups[a].x;swBX=cups[b].x;
+  const tmp=cups[a].ball;cups[a].ball=cups[b].ball;cups[b].ball=tmp;
+}
+function confirm(){
+  if(S!=='choose')return;
+  cups[sel].ball?onCorrect():onDeath();
+}
+function onCorrect(){
+  S='correct';score++;cT=0;
+  cMsg=CMSG[Math.floor(Math.random()*CMSG.length)];
+  lift=0;liftT=1;
+  spawnSparks(cups[sel].x,CY,25,'#00FF44');
+  if(score>hi){hi=score;localStorage.setItem('soulCupsHigh',hi);}
+  updateHUD();
+}
+function onDeath(){
+  S='death';dT=0;dPh=0;shake=0;bAlpha=0;
+  dMsg=DMSG[Math.floor(Math.random()*DMSG.length)];
+  lift=0;liftT=1;
+  spawnBlood(W/2,H/2,60);
+}
+
+// --- DEATH SEQUENCE ---
+function drawDeath(){
+  dT++;
+  if(dT<70){dPh=0;shake=Math.min(dT*0.4,18);
+    // Skull flash at frame 30-50
+    if(dT>30&&dT<50){const skA=Math.sin((dT-30)/20*Math.PI)*0.7;drawSkullFlash(skA);}
+  }
+  else if(dT<170){dPh=1;bAlpha=Math.min((dT-70)/100,0.9);
+    shake=18+Math.sin(dT*0.4)*8;
+    if(dT%2===0)blood.push({x:Math.random()*W,y:-5,vx:(Math.random()-0.5)*2,
+      vy:Math.random()*6+2,sz:Math.random()*5+2,life:90});
+    if(dT%4===0)spawnSparks(Math.random()*W,Math.random()*H,3,'#FF0000');
+    // Screen cracks appear
+    drawCracks(Math.min((dT-70)/40,0.5));
+  }else if(dT<350){dPh=2;bAlpha=0.9;shake=Math.max(0,18-(dT-170)*0.12);
+    drawCracks(0.3);
+  }
+  else{showGO();return;}
+
+  if(bAlpha>0){X.save();X.globalAlpha=bAlpha;
+    X.fillStyle='#1A0000';X.fillRect(0,0,W,H);X.restore();}
+
+  if(dPh>=2){
+    const ma=Math.min((dT-170)/25,1);
+    X.save();X.globalAlpha=ma;
+    // Chromatic aberration on text
+    X.font='bold 44px "Courier New"';X.textAlign='center';X.textBaseline='middle';
+    const gx=(Math.random()-0.5)*4,gy=(Math.random()-0.5)*4;
+    // Red channel
+    X.fillStyle='rgba(255,0,0,0.6)';X.fillText(dMsg,W/2+gx+2,H/2-50+gy);
+    // Main text
+    X.fillStyle='#FF0000';X.shadowBlur=50;X.shadowColor='#FF0000';
+    X.fillText(dMsg,W/2+gx,H/2-50+gy);
+    // Sub
+    X.font='bold 24px "Courier New"';X.fillStyle='#8B0000';X.shadowBlur=20;
+    X.fillText('YOU ARE DEAD',W/2,H/2+20);
+    X.font='18px "Courier New"';X.fillStyle='#550000';X.shadowBlur=0;
+    X.fillText('Souls collected: '+score,W/2,H/2+60);
+    X.restore();
+  }
+}
+
+// --- CORRECT SEQUENCE ---
+function drawCorrect(){
+  cT++;
+  if(cT<50){}
+  else if(cT<140){
+    const a=Math.min((cT-50)/20,1);
+    X.save();X.globalAlpha=a;
+    X.fillStyle='#00FF44';X.shadowBlur=30;X.shadowColor='#00FF44';
+    X.font='bold 28px "Courier New"';X.textAlign='center';X.textBaseline='middle';
+    X.fillText(cMsg,W/2,160);
+    X.restore();
+  }else{
+    round++;liftT=0;updateHUD();resetCups();
+    S='reveal';lift=0;liftT=1;
+    setTimeout(()=>{liftT=0;setTimeout(()=>beginShuffle(),600);},1500);
+  }
+}
+
+// --- GAME OVER ---
+function showGO(){
+  S='gameover';C.style.transform='';
+  OV.innerHTML='<div class="title" style="font-size:64px;">DEAD</div>'+
+    '<div class="subtitle">YOUR SOUL HAS BEEN CLAIMED</div>'+
+    '<div style="color:#FF0000;font-size:22px;margin-bottom:8px;">Souls: '+score+'</div>'+
+    '<div style="color:#8B0000;font-size:18px;margin-bottom:8px;">Rounds: '+(round-1)+'</div>'+
+    '<div style="color:#553300;font-size:16px;margin-bottom:28px;">Best: '+hi+'</div>'+
+    '<div class="startBtn" id="retryBtn">TRY AGAIN</div>'+
+    '<div class="controls-hint">ESC or COIN to return to menu</div>';
+  OV.style.display='flex';
+  document.getElementById('retryBtn').addEventListener('click',startGame);
+}
+
+// --- UPDATE ---
+function update(){
+  F++;
+  // Lift easing (spring-like)
+  const liftSpd=0.045;
+  if(lift<liftT)lift=Math.min(lift+liftSpd,liftT);
+  if(lift>liftT)lift=Math.max(lift-liftSpd,liftT);
+
+  // Swap with vertical arc
+  if(swOn&&S==='shuffle'){
+    swP+=1/(sSpd/16.67);
+    if(swP>=1){swP=1;cups[swA].x=swBX;cups[swB].x=swAX;swOn=false;swapYA=0;swapYB=0;
+      setTimeout(doSwap,30);}
+    else{
+      const t=swP,e=t<0.5?2*t*t:-1+(4-2*t)*t;
+      cups[swA].x=swAX+(swBX-swAX)*e;
+      cups[swB].x=swBX+(swAX-swBX)*e;
+      // Vertical arc: A goes up, B goes down
+      swapYA=-Math.sin(t*Math.PI)*45;
+      swapYB=Math.sin(t*Math.PI)*25;
+    }
+  }else{swapYA=0;swapYB=0;}
+}
+
+// --- MAIN LOOP ---
+function loop(){
+  if(S==='death'&&shake>0){
+    const sx=(Math.random()-0.5)*shake*2,sy=(Math.random()-0.5)*shake*2;
+    C.style.transform=`translate(${sx}px,${sy}px)`;
+  }else if(S!=='death')C.style.transform='';
+
+  update();
+  X.clearRect(0,0,W,H);
+  drawBG();drawFog();drawEyes();drawCandles();drawEmbers();drawSmoke();
+
+  // Ball under lifted cup
+  if(lift>0.3)cups.forEach(c=>{if(c.ball)drawBall(c.x,CY+CH/2+15);});
+
+  // Cups with vertical arc offsets
+  cups.forEach((c,i)=>{
+    let yOff=0;
+    if(swOn&&i===swA)yOff=swapYA;
+    if(swOn&&i===swB)yOff=swapYB;
+    drawCup(c.x,CY+yOff,i===sel&&S==='choose',lift,i);
+  });
+
+  drawSparks();drawBlood();
+  drawVignette(S==='death'?0.4:0);drawHeartbeat();drawNoise();
+
+  if(S==='death')drawDeath();
+  if(S==='correct')drawCorrect();
+
+  // State text
+  if(S==='choose'){X.save();
+    const p=Math.sin(F*0.06)*0.3+0.7;
+    X.globalAlpha=p;X.fillStyle='#FF0000';X.shadowBlur=25;X.shadowColor='#FF0000';
+    X.font='bold 24px "Courier New"';X.textAlign='center';
+    X.fillText('CHOOSE YOUR FATE',W/2,100);X.restore();}
+  if(S==='shuffle'){X.save();X.fillStyle='#660000';X.shadowBlur=10;X.shadowColor='#660000';
+    X.font='bold 20px "Courier New"';X.textAlign='center';
+    X.fillText('THE SPIRITS MOVE...',W/2,100);X.restore();}
+  if(S==='reveal'){X.save();X.fillStyle='#440000';X.shadowBlur=10;X.shadowColor='#440000';
+    X.font='bold 20px "Courier New"';X.textAlign='center';
+    X.fillText('BEHOLD THE SOUL...',W/2,100);X.restore();}
+
+  handleGP();requestAnimationFrame(loop);
+}
+
+// --- INPUT ---
+let axP=false,stP=false,coP=false;
+function handleGP(){
+  const g=navigator.getGamepads()[0];if(!g)return;
+  const ax=g.axes[0],d=0.3;
+  if(S==='choose'){
+    if(Math.abs(ax)>d){if(!axP){if(ax<-d&&sel>0)sel--;if(ax>d&&sel<2)sel++;axP=true;}}else axP=false;
+    if(g.buttons[3]?.pressed&&!stP){stP=true;confirm();}else if(!g.buttons[3]?.pressed)stP=false;
+  }
+  if((S==='menu'||S==='gameover')&&g.buttons[3]?.pressed&&!stP){stP=true;startGame();}
+  else if(!g.buttons[3]?.pressed)stP=false;
+  if(g.buttons[2]?.pressed&&!coP){coP=true;window.location.href='index.html';}
+  else if(!g.buttons[2]?.pressed)coP=false;
+}
+document.addEventListener('keydown',e=>{
+  if(S==='choose'){
+    if(e.code==='ArrowLeft'&&sel>0)sel--;
+    if(e.code==='ArrowRight'&&sel<2)sel++;
+    if(e.code==='Enter'||e.code==='Space'){e.preventDefault();confirm();}
+  }
+  if((S==='menu'||S==='gameover')&&(e.code==='Enter'||e.code==='Space')){e.preventDefault();startGame();}
+  if(e.code==='Escape')window.location.href='index.html';
+});
+
+// --- INIT ---
+function init(){
+  hud=document.createElement('div');hud.id='hud';
+  hud.innerHTML='<span class="hud-score">SOULS: <span id="sV">0</span></span>'+
+    '<span class="hud-round">ROUND: <span id="rV">1</span></span>'+
+    '<span class="hud-best">BEST: <span id="bV">'+hi+'</span></span>';
+  document.getElementById('gameContainer').appendChild(hud);hud.style.display='none';
+  initAmbient();
+  document.getElementById('startBtn').addEventListener('click',startGame);
+  requestAnimationFrame(loop);
+}
+init();
+</script>
+</body>
+</html>

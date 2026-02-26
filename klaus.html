@@ -1,0 +1,2892 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>KLAUS! - Cat Explorer</title>
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  overflow:hidden;
+  font-family:'Courier New',monospace;
+  height:100vh;
+}
+#gameCanvas{
+  display:block;
+  width:100vw;
+  height:100vh;
+}
+#hud{
+  position:fixed;
+  top:20px;
+  left:50%;
+  transform:translateX(-50%);
+  display:none;
+  gap:40px;
+  font-size:24px;
+  font-weight:bold;
+  z-index:10;
+}
+.hud-item{
+  color:#90EE90;
+  text-shadow:0 0 10px #90EE90;
+}
+#meters{
+  position:fixed;
+  top:20px;
+  right:20px;
+  display:none;
+  flex-direction:column;
+  gap:12px;
+  z-index:10;
+  font-size:16px;
+  font-weight:bold;
+  font-family:'Courier New',monospace;
+}
+.meter-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.meter-label{
+  color:#fff;
+  text-shadow:0 0 6px rgba(255,255,255,0.5);
+  min-width:90px;
+  font-size:14px;
+}
+.meter-bar-bg{
+  width:160px;
+  height:18px;
+  background:rgba(0,0,0,0.6);
+  border:2px solid rgba(255,255,255,0.3);
+  border-radius:3px;
+  overflow:hidden;
+  position:relative;
+}
+.meter-bar-fill{
+  height:100%;
+  width:0%;
+  transition:width 0.3s ease, background 0.3s ease;
+  border-radius:2px;
+}
+.meter-bar-fill.hunger{
+  background:linear-gradient(90deg,#4CAF50,#8BC34A);
+}
+.meter-bar-fill.poop{
+  background:linear-gradient(90deg,#4CAF50,#8BC34A);
+}
+.meter-bar-fill.zoomie{
+  background:linear-gradient(90deg,#2196F3,#9C27B0);
+}
+.meter-value{
+  color:#fff;
+  font-size:12px;
+  min-width:36px;
+  text-align:right;
+  text-shadow:0 0 4px rgba(0,0,0,0.8);
+}
+#hungerVignette{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:15;
+  opacity:0;
+  background:radial-gradient(ellipse at center, transparent 50%, rgba(255,0,0,0.4) 100%);
+  transition:opacity 0.5s ease;
+}
+#poopFlash{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:15;
+  opacity:0;
+  background:radial-gradient(ellipse at center, rgba(139,90,43,0.5) 0%, rgba(92,51,23,0.3) 50%, transparent 80%);
+  transition:opacity 0.3s ease;
+}
+#poopAlert{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  font-size:120px;
+  pointer-events:none;
+  z-index:16;
+  opacity:0;
+  filter:drop-shadow(0 0 20px rgba(255,200,0,0.8));
+  transition:opacity 0.15s ease;
+}
+#poopCaption{
+  position:fixed;
+  bottom:15%;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:32px;
+  font-weight:bold;
+  font-family:'Courier New',monospace;
+  color:#8B4513;
+  text-shadow:0 0 10px rgba(139,69,19,0.6), 2px 2px 0 #000;
+  pointer-events:none;
+  z-index:16;
+  opacity:0;
+  transition:opacity 0.2s ease;
+}
+#disgustFlash{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:15;
+  opacity:0;
+  background:radial-gradient(ellipse at center, rgba(200,30,30,0.45) 0%, rgba(120,10,10,0.25) 50%, transparent 80%);
+  transition:opacity 0.3s ease;
+}
+#disgustAlert{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  font-size:120px;
+  pointer-events:none;
+  z-index:16;
+  opacity:0;
+  filter:drop-shadow(0 0 20px rgba(255,50,50,0.8));
+  transition:opacity 0.15s ease;
+}
+#disgustCaption{
+  position:fixed;
+  bottom:15%;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:32px;
+  font-weight:bold;
+  font-family:'Courier New',monospace;
+  color:#CC2222;
+  text-shadow:0 0 10px rgba(200,30,30,0.6), 2px 2px 0 #000;
+  pointer-events:none;
+  z-index:16;
+  opacity:0;
+  transition:opacity 0.2s ease;
+}
+#overlay{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.85);
+  z-index:20;
+  text-align:center;
+}
+.title{
+  font-size:72px;
+  color:#90EE90;
+  text-shadow:0 0 30px #90EE90,0 0 60px #228B22;
+  margin-bottom:10px;
+  animation:titleGlow 2s ease-in-out infinite alternate;
+}
+@keyframes titleGlow{
+  from{text-shadow:0 0 20px #90EE90,0 0 40px #228B22;}
+  to{text-shadow:0 0 40px #90EE90,0 0 80px #228B22,0 0 120px #90EE90;}
+}
+.subtitle{
+  font-size:24px;
+  color:#FFB6C1;
+  margin-bottom:40px;
+  text-shadow:0 0 15px #FFB6C1;
+}
+.instructions{
+  color:#fff;
+  font-size:18px;
+  line-height:2;
+  margin-bottom:30px;
+}
+.instructions strong{
+  color:#90EE90;
+}
+.cat-ascii{
+  font-size:64px;
+  margin-bottom:20px;
+  filter:drop-shadow(0 0 20px #000);
+}
+.startBtn{
+  padding:15px 40px;
+  background:#228B22;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  font-size:22px;
+  font-weight:bold;
+  font-family:'Courier New',monospace;
+  cursor:pointer;
+  box-shadow:0 0 25px #228B22;
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.7;}
+}
+.menu-hint{
+  margin-top:20px;
+  color:#00F5FF;
+  font-size:16px;
+}
+#zoomieOverlay{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:14;
+  opacity:0;
+  background:radial-gradient(ellipse at center, transparent 30%, rgba(255,0,255,0.15) 60%, rgba(0,255,255,0.2) 100%);
+  mix-blend-mode:screen;
+  transition:opacity 0.3s ease;
+}
+#zoomieSpeedlines{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:14;
+  opacity:0;
+  background:radial-gradient(ellipse at center, transparent 40%, rgba(255,255,255,0.3) 100%);
+  transition:opacity 0.2s ease;
+}
+#zoomieAlert{
+  position:fixed;
+  top:20%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  font-size:64px;
+  font-weight:bold;
+  font-family:'Courier New',monospace;
+  color:#FFD700;
+  text-shadow:0 0 20px #FF00FF, 0 0 40px #00FFFF, 0 0 60px #FFD700, 3px 3px 0 #000;
+  pointer-events:none;
+  z-index:17;
+  opacity:0;
+  transition:opacity 0.2s ease;
+  white-space:nowrap;
+  letter-spacing:4px;
+}
+#mushroomLoveFlash{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:15;
+  opacity:0;
+  background:radial-gradient(ellipse at center, rgba(255,182,193,0.45) 0%, rgba(255,105,180,0.2) 50%, transparent 80%);
+  transition:opacity 0.3s ease;
+}
+#mushroomLoveAlert{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  font-size:120px;
+  pointer-events:none;
+  z-index:16;
+  opacity:0;
+  filter:drop-shadow(0 0 20px rgba(255,105,180,0.8));
+  transition:opacity 0.15s ease;
+}
+#mushroomLoveCaption{
+  position:fixed;
+  bottom:15%;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:32px;
+  font-weight:bold;
+  font-family:'Courier New',monospace;
+  color:#FF69B4;
+  text-shadow:0 0 10px rgba(255,105,180,0.6), 2px 2px 0 #000;
+  pointer-events:none;
+  z-index:16;
+  opacity:0;
+  transition:opacity 0.2s ease;
+}
+#mushroomHeartsContainer{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  z-index:16;
+  overflow:hidden;
+}
+.floating-heart{
+  position:absolute;
+  font-size:40px;
+  opacity:0;
+  animation:floatHeart 2s ease-out forwards;
+  pointer-events:none;
+}
+@keyframes floatHeart{
+  0%{opacity:1;transform:translateY(0) scale(0.5) rotate(0deg);}
+  50%{opacity:1;transform:translateY(-80px) scale(1.2) rotate(15deg);}
+  100%{opacity:0;transform:translateY(-180px) scale(0.8) rotate(-10deg);}
+}
+@keyframes zoomieBarPulse{
+  0%,100%{box-shadow:0 0 4px rgba(255,0,255,0.3);}
+  50%{box-shadow:0 0 12px rgba(0,255,255,0.6), 0 0 20px rgba(255,0,255,0.4);}
+}
+.scanline{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.1),
+    rgba(0,0,0,0.1) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+  z-index:100;
+}
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud">
+  <div class="hud-item">🍽️ EATEN: <span id="butterfliesEaten">0</span></div>
+  <div class="hud-item">🦋 NEARBY: <span id="butterfliesFound">0</span></div>
+</div>
+
+<div id="meters">
+  <div class="meter-row">
+    <span class="meter-label">🍖 HUNGER</span>
+    <div class="meter-bar-bg">
+      <div class="meter-bar-fill hunger" id="hungerFill"></div>
+    </div>
+    <span class="meter-value" id="hungerValue">0%</span>
+  </div>
+  <div class="meter-row">
+    <span class="meter-label">💩 POOP</span>
+    <div class="meter-bar-bg">
+      <div class="meter-bar-fill poop" id="poopFill"></div>
+    </div>
+    <span class="meter-value" id="poopValue">0%</span>
+  </div>
+  <div class="meter-row">
+    <span class="meter-label">⚡ ZOOMIES</span>
+    <div class="meter-bar-bg">
+      <div class="meter-bar-fill zoomie" id="zoomieFill"></div>
+    </div>
+    <span class="meter-value" id="zoomieValue">0%</span>
+  </div>
+</div>
+
+<div id="hungerVignette"></div>
+<div id="poopFlash"></div>
+<div id="poopAlert">⚠️</div>
+<div id="poopCaption"></div>
+<div id="disgustFlash"></div>
+<div id="disgustAlert"></div>
+<div id="disgustCaption"></div>
+<div id="mushroomLoveFlash"></div>
+<div id="mushroomLoveAlert"></div>
+<div id="mushroomLoveCaption"></div>
+<div id="mushroomHeartsContainer"></div>
+<div id="zoomieOverlay"></div>
+<div id="zoomieSpeedlines"></div>
+<div id="zoomieAlert"></div>
+
+<div id="overlay">
+  <div class="cat-ascii">🐈‍⬛</div>
+  <div class="title">KLAUS!</div>
+  <div class="subtitle">A Cat's Adventure</div>
+  <div class="instructions">
+    <strong>Joystick / WASD:</strong> Walk around (push hard to sprint)<br>
+    <strong>ACTION 1 / E:</strong> Eat / Pounce 🦋<br>
+    <strong>ACTION 2 / SPACE:</strong> Jump<br>
+    <strong>Q:</strong> Poop 💩 (when meter > 50%)<br>
+    <strong>⚡ ZOOMIES:</strong> Fills up over time (eating & pooping boost it!)<br>
+    <strong>START / ENTER:</strong> Begin Game<br>
+    <strong>COIN / ESC:</strong> Return to Menu
+  </div>
+  <div class="startBtn" onclick="startGame()">PRESS START</div>
+  <div class="menu-hint">Press COIN to return to menu</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+// KLAUS! - A 3rd Person Cat Explorer
+// ============================================================
+
+// Game state
+let gameState = 'start'; // 'start', 'playing'
+const overlay = document.getElementById('overlay');
+const hud = document.getElementById('hud');
+
+const meters = document.getElementById('meters');
+
+function startGame() {
+  gameState = 'playing';
+  overlay.style.display = 'none';
+  hud.style.display = 'flex';
+  meters.style.display = 'flex';
+}
+
+function returnToMenu() {
+  window.location.href = 'index.html';
+}
+
+// Gamepad polling state
+let startPressed = false;
+let coinPressed = false;
+
+// ============================================================
+// THREE.JS SCENE SETUP
+// ============================================================
+const canvas = document.getElementById('gameCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+
+// Sky color
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 80, 200);
+
+// Camera (will be positioned by follow logic later)
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 8, 15);
+camera.lookAt(0, 0, 0);
+
+// ============================================================
+// LIGHTING
+// ============================================================
+// Warm sunlight
+const sunLight = new THREE.DirectionalLight(0xFFF8E1, 1.2);
+sunLight.position.set(50, 80, 30);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 200;
+sunLight.shadow.camera.left = -60;
+sunLight.shadow.camera.right = 60;
+sunLight.shadow.camera.top = 60;
+sunLight.shadow.camera.bottom = -60;
+scene.add(sunLight);
+scene.add(sunLight.target);
+
+// Ambient light (soft blue fill)
+const ambientLight = new THREE.AmbientLight(0x88AACC, 0.5);
+scene.add(ambientLight);
+
+// Hemisphere light (sky/ground)
+const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556B2F, 0.4);
+scene.add(hemiLight);
+
+// ============================================================
+// TERRAIN - Grass ground
+// ============================================================
+const WORLD_SIZE = 160;
+
+// Main grass plane
+const grassGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
+// Add gentle hills
+const grassVerts = grassGeo.attributes.position;
+for (let i = 0; i < grassVerts.count; i++) {
+  const x = grassVerts.getX(i);
+  const y = grassVerts.getY(i);
+  const height = Math.sin(x * 0.05) * 1.5 + Math.cos(y * 0.07) * 1.2 + Math.sin(x * 0.12 + y * 0.08) * 0.8;
+  grassVerts.setZ(i, height);
+}
+grassGeo.computeVertexNormals();
+
+const grassMat = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+const grassMesh = new THREE.Mesh(grassGeo, grassMat);
+grassMesh.rotation.x = -Math.PI / 2;
+grassMesh.receiveShadow = true;
+scene.add(grassMesh);
+
+// Darker grass patches for variety
+for (let i = 0; i < 30; i++) {
+  const patchSize = 5 + Math.random() * 10;
+  const patchGeo = new THREE.CircleGeometry(patchSize, 16);
+  const shade = 0.3 + Math.random() * 0.3;
+  const patchMat = new THREE.MeshLambertMaterial({
+    color: new THREE.Color(shade * 0.3, shade, shade * 0.2)
+  });
+  const patch = new THREE.Mesh(patchGeo, patchMat);
+  patch.rotation.x = -Math.PI / 2;
+  const patchX = (Math.random() - 0.5) * WORLD_SIZE * 0.8;
+  const patchZ = (Math.random() - 0.5) * WORLD_SIZE * 0.8;
+  patch.position.set(
+    patchX,
+    getTerrainHeight(patchX, patchZ) + 0.05,
+    patchZ
+  );
+  patch.receiveShadow = true;
+  scene.add(patch);
+}
+
+// ============================================================
+// CLOUDS
+// ============================================================
+function createCloud(x, y, z) {
+  const group = new THREE.Group();
+  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.9 });
+  const puffCount = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < puffCount; i++) {
+    const size = 2 + Math.random() * 3;
+    const puffGeo = new THREE.SphereGeometry(size, 8, 6);
+    const puff = new THREE.Mesh(puffGeo, cloudMat);
+    puff.position.set(i * 2.5 - puffCount, Math.random() * 1.5, Math.random() * 2 - 1);
+    puff.scale.y = 0.6;
+    group.add(puff);
+  }
+  group.position.set(x, y, z);
+  group.userData = { speed: 0.02 + Math.random() * 0.03 };
+  scene.add(group);
+  return group;
+}
+
+const clouds = [];
+for (let i = 0; i < 15; i++) {
+  const cloud = createCloud(
+    (Math.random() - 0.5) * WORLD_SIZE * 1.5,
+    30 + Math.random() * 20,
+    (Math.random() - 0.5) * WORLD_SIZE * 1.5
+  );
+  clouds.push(cloud);
+}
+
+// ============================================================
+// SUN (decorative sphere in the sky)
+// ============================================================
+const sunGeo = new THREE.SphereGeometry(5, 16, 16);
+const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFF88 });
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+sunMesh.position.set(50, 80, -30);
+scene.add(sunMesh);
+
+// ============================================================
+// KLAUS THE CAT - Built from primitives
+// ============================================================
+const klaus = new THREE.Group();
+
+// Materials
+const blackFur = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+const darkFur = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+const nosePink = new THREE.MeshLambertMaterial({ color: 0xFF69B4 });
+const eyeWhite = new THREE.MeshBasicMaterial({ color: 0xCCFF00 });
+const eyePupil = new THREE.MeshBasicMaterial({ color: 0x000000 });
+const innerEar = new THREE.MeshLambertMaterial({ color: 0xFF8FAB });
+
+// Body (main torso - elongated box)
+const bodyGeo = new THREE.BoxGeometry(2.2, 1.6, 3.5);
+const body = new THREE.Mesh(bodyGeo, blackFur);
+body.position.set(0, 1.8, 0);
+body.castShadow = true;
+klaus.add(body);
+
+// Belly (slightly lighter underside)
+const bellyGeo = new THREE.BoxGeometry(1.8, 0.6, 3.0);
+const belly = new THREE.Mesh(bellyGeo, darkFur);
+belly.position.set(0, -0.6, 0);
+body.add(belly);
+
+// Head
+const headGeo = new THREE.BoxGeometry(2.0, 1.8, 1.8);
+const head = new THREE.Mesh(headGeo, blackFur);
+head.position.set(0, 0.6, -2.2);
+head.castShadow = true;
+body.add(head);
+
+// Snout (small protruding box)
+const snoutGeo = new THREE.BoxGeometry(1.0, 0.6, 0.6);
+const snout = new THREE.Mesh(snoutGeo, darkFur);
+snout.position.set(0, -0.3, -1.0);
+head.add(snout);
+
+// Nose
+const noseGeo = new THREE.BoxGeometry(0.35, 0.25, 0.15);
+const nose = new THREE.Mesh(noseGeo, nosePink);
+nose.position.set(0, 0.15, -0.35);
+snout.add(nose);
+
+// Mouth (hidden by default, shown during poop face)
+const mouthMat = new THREE.MeshBasicMaterial({ color: 0x330000 });
+const mouthGeo = new THREE.SphereGeometry(0.18, 8, 6);
+const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+mouth.position.set(0, -0.15, -0.35);
+mouth.scale.set(1.2, 0.8, 0.5);
+mouth.visible = false;
+snout.add(mouth);
+
+// Sweat drops (hidden by default)
+const sweatMat = new THREE.MeshBasicMaterial({ color: 0x88CCFF, transparent: true, opacity: 0.8 });
+const sweatGeo = new THREE.SphereGeometry(0.08, 6, 4);
+const sweatL = new THREE.Mesh(sweatGeo, sweatMat);
+sweatL.position.set(-0.8, 0.8, -0.5);
+sweatL.scale.set(0.8, 1.3, 0.5);
+sweatL.visible = false;
+head.add(sweatL);
+const sweatR = new THREE.Mesh(sweatGeo, sweatMat);
+sweatR.position.set(0.8, 0.8, -0.5);
+sweatR.scale.set(0.8, 1.3, 0.5);
+sweatR.visible = false;
+head.add(sweatR);
+
+// Left eye
+const eyeGeoL = new THREE.SphereGeometry(0.28, 8, 8);
+const eyeL = new THREE.Mesh(eyeGeoL, eyeWhite);
+eyeL.position.set(-0.5, 0.3, -0.9);
+head.add(eyeL);
+const pupilGeoL = new THREE.SphereGeometry(0.15, 8, 8);
+const pupilL = new THREE.Mesh(pupilGeoL, eyePupil);
+pupilL.position.set(0, 0, -0.2);
+eyeL.add(pupilL);
+
+// Right eye
+const eyeR = new THREE.Mesh(eyeGeoL, eyeWhite);
+eyeR.position.set(0.5, 0.3, -0.9);
+head.add(eyeR);
+const pupilR = new THREE.Mesh(pupilGeoL, eyePupil);
+pupilR.position.set(0, 0, -0.2);
+eyeR.add(pupilR);
+
+// Left ear
+const earGeo = new THREE.ConeGeometry(0.4, 0.8, 4);
+const earL = new THREE.Mesh(earGeo, blackFur);
+earL.position.set(-0.6, 1.1, -0.2);
+earL.rotation.z = -0.2;
+earL.castShadow = true;
+head.add(earL);
+// Inner ear
+const innerEarGeo = new THREE.ConeGeometry(0.22, 0.5, 4);
+const innerEarL = new THREE.Mesh(innerEarGeo, innerEar);
+innerEarL.position.set(0, -0.05, -0.08);
+earL.add(innerEarL);
+
+// Right ear
+const earR = new THREE.Mesh(earGeo, blackFur);
+earR.position.set(0.6, 1.1, -0.2);
+earR.rotation.z = 0.2;
+earR.castShadow = true;
+head.add(earR);
+const innerEarR = new THREE.Mesh(innerEarGeo, innerEar);
+innerEarR.position.set(0, -0.05, -0.08);
+earR.add(innerEarR);
+
+// Whiskers (thin cylinders)
+const whiskerMat = new THREE.MeshBasicMaterial({ color: 0xCCCCCC });
+const whiskerGeo = new THREE.CylinderGeometry(0.015, 0.015, 1.2, 4);
+function addWhisker(xOff, yOff, zOff, rotZ) {
+  const w = new THREE.Mesh(whiskerGeo, whiskerMat);
+  w.position.set(xOff, yOff, zOff);
+  w.rotation.z = rotZ;
+  w.rotation.y = Math.PI / 2;
+  snout.add(w);
+}
+addWhisker(-0.5, 0.1, -0.1, 0.1);
+addWhisker(-0.5, 0.0, -0.1, 0);
+addWhisker(-0.5, -0.1, -0.1, -0.1);
+addWhisker(0.5, 0.1, -0.1, -0.1);
+addWhisker(0.5, 0.0, -0.1, 0);
+addWhisker(0.5, -0.1, -0.1, 0.1);
+
+// Legs
+const legGeo = new THREE.BoxGeometry(0.5, 1.2, 0.5);
+const pawGeo = new THREE.BoxGeometry(0.6, 0.3, 0.7);
+const pawMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+
+function createLeg(x, z) {
+  const leg = new THREE.Mesh(legGeo, blackFur);
+  leg.position.set(x, -1.2, z);
+  leg.castShadow = true;
+  body.add(leg);
+  // Paw
+  const paw = new THREE.Mesh(pawGeo, pawMat);
+  paw.position.set(0, -0.7, -0.05);
+  leg.add(paw);
+  return leg;
+}
+
+const legFL = createLeg(-0.7, -1.2); // front left
+const legFR = createLeg(0.7, -1.2);  // front right
+const legBL = createLeg(-0.7, 1.2);  // back left
+const legBR = createLeg(0.7, 1.2);   // back right
+
+// Tail - long fluffy cat tail with many segments for fluid curves
+const tailSegments = [];
+const tailGroup = new THREE.Group();
+tailGroup.position.set(0, 0.3, 1.75);
+// Slight upward angle at the base (cats hold tails up from the body)
+tailGroup.rotation.x = -0.4;
+body.add(tailGroup);
+
+const TAIL_SEG_COUNT = 14;
+const TAIL_LENGTH = 4.5; // longer tail
+const segLength = TAIL_LENGTH / TAIL_SEG_COUNT;
+
+// Fluffy fur material (slightly lighter than body for depth)
+const fluffFur = new THREE.MeshLambertMaterial({ color: 0x222222 });
+
+for (let i = 0; i < TAIL_SEG_COUNT; i++) {
+  // Taper: thick at base, thin at tip - but overall much thicker for fluffiness
+  const t = i / (TAIL_SEG_COUNT - 1); // 0 at base, 1 at tip
+  const radiusTop = THREE.MathUtils.lerp(0.30, 0.10, Math.min(1, (i + 1) / (TAIL_SEG_COUNT - 1)));
+  const radiusBottom = THREE.MathUtils.lerp(0.30, 0.10, t);
+  
+  // Use cylinder geometry for round, smooth segments
+  const segGeo = new THREE.CylinderGeometry(radiusTop, radiusBottom, segLength, 8, 1);
+  // Rotate so cylinder extends along Z axis instead of Y
+  segGeo.rotateX(Math.PI / 2);
+  // Shift geometry so pivot is at the base of each segment
+  segGeo.translate(0, 0, segLength / 2);
+  
+  const seg = new THREE.Mesh(segGeo, blackFur);
+  seg.castShadow = true;
+  
+  // Add fluffy fur puffs - overlapping spheres that stick out around the cylinder
+  // More puffs in the middle, fewer at base and tip
+  const fluffiness = Math.sin(t * Math.PI) * 0.8 + 0.4; // peaks in middle
+  const puffRadius = THREE.MathUtils.lerp(0.28, 0.12, t) * fluffiness;
+  const puffCount = t < 0.15 ? 2 : (t > 0.9 ? 2 : 3); // fewer at extremes
+  
+  for (let p = 0; p < puffCount; p++) {
+    const puffGeo = new THREE.SphereGeometry(puffRadius, 6, 4);
+    const puff = new THREE.Mesh(puffGeo, fluffFur);
+    // Distribute puffs around the circumference at slightly random positions
+    const angle = (p / puffCount) * Math.PI * 2 + (i * 0.7); // offset per segment for variety
+    const outward = THREE.MathUtils.lerp(0.12, 0.04, t); // how far puffs stick out
+    puff.position.set(
+      Math.cos(angle) * outward,
+      Math.sin(angle) * outward,
+      segLength * (0.3 + Math.random() * 0.4) // spread along segment length
+    );
+    puff.scale.set(1, 1, 1.3); // slightly elongated along tail direction
+    puff.castShadow = true;
+    seg.add(puff);
+  }
+  
+  if (i === 0) {
+    tailGroup.add(seg);
+  } else {
+    // Each segment is parented to the previous, positioned at its end
+    tailSegments[i - 1].add(seg);
+    seg.position.set(0, 0, segLength);
+  }
+  tailSegments.push(seg);
+}
+
+// Add a big fluffy rounded tip at the very end of the tail
+const tipGeo = new THREE.SphereGeometry(0.14, 8, 6);
+const tailTip = new THREE.Mesh(tipGeo, blackFur);
+tailTip.position.set(0, 0, segLength);
+tailTip.castShadow = true;
+tailSegments[TAIL_SEG_COUNT - 1].add(tailTip);
+
+// Extra fluffy tip tuft
+const tuftGeo = new THREE.SphereGeometry(0.18, 6, 4);
+const tailTuft = new THREE.Mesh(tuftGeo, fluffFur);
+tailTuft.position.set(0, 0, segLength * 0.8);
+tailTuft.scale.set(1.1, 1.1, 1.4);
+tailTuft.castShadow = true;
+tailSegments[TAIL_SEG_COUNT - 1].add(tailTuft);
+
+// Position Klaus in the world
+klaus.position.set(0, 0, 0);
+scene.add(klaus);
+
+// Klaus state
+const klausState = {
+  velocity: new THREE.Vector3(),
+  rotation: 0,
+  isJumping: false,
+  jumpVelocity: 0,
+  walkCycle: 0,
+  isSprinting: false,
+};
+
+// ============================================================
+// HELPER: Get terrain height at position
+// ============================================================
+function getTerrainHeight(x, z) {
+  // The grass plane is created in XY space then rotated -90° around X.
+  // After rotation: world X = plane X, world Z = -plane Y, world Y = plane Z (height).
+  // So we must negate z to match the plane's Y coordinate.
+  const planeY = -z;
+  return Math.sin(x * 0.05) * 1.5 + Math.cos(planeY * 0.07) * 1.2 + Math.sin(x * 0.12 + planeY * 0.08) * 0.8;
+}
+
+// ============================================================
+// WORLD DETAILS - Butterflies, flowers, trees, cat toys
+// ============================================================
+
+// --- TREES ---
+function createTree(x, z) {
+  const group = new THREE.Group();
+  const h = getTerrainHeight(x, z);
+  
+  // Trunk
+  const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 4, 8);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 2;
+  trunk.castShadow = true;
+  group.add(trunk);
+  
+  // Foliage (stacked spheres)
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+  const sizes = [3, 2.5, 1.8];
+  const heights = [4.5, 6, 7.2];
+  sizes.forEach((s, i) => {
+    const leafGeo = new THREE.SphereGeometry(s, 8, 6);
+    const leaf = new THREE.Mesh(leafGeo, leafMat);
+    leaf.position.y = heights[i];
+    leaf.castShadow = true;
+    group.add(leaf);
+  });
+  
+  group.position.set(x, h, z);
+  scene.add(group);
+  return group;
+}
+
+// Place trees
+const trees = [];
+for (let i = 0; i < 40; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.85;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.85;
+  // Don't place too close to spawn
+  if (Math.sqrt(x * x + z * z) < 10) continue;
+  trees.push(createTree(x, z));
+}
+
+// --- FLOWERS ---
+function createFlower(x, z) {
+  const group = new THREE.Group();
+  const h = getTerrainHeight(x, z);
+  
+  // Stem
+  const stemGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 4);
+  const stemMat = new THREE.MeshLambertMaterial({ color: 0x2E8B57 });
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = 0.4;
+  group.add(stem);
+  
+  // Petals
+  const colors = [0xFF69B4, 0xFF6347, 0xFFD700, 0xFF00FF, 0x87CEEB, 0xFFA500];
+  const petalColor = colors[Math.floor(Math.random() * colors.length)];
+  const petalMat = new THREE.MeshLambertMaterial({ color: petalColor });
+  
+  for (let p = 0; p < 5; p++) {
+    const petalGeo = new THREE.SphereGeometry(0.15, 6, 4);
+    const petal = new THREE.Mesh(petalGeo, petalMat);
+    const angle = (p / 5) * Math.PI * 2;
+    petal.position.set(Math.cos(angle) * 0.2, 0.85, Math.sin(angle) * 0.2);
+    group.add(petal);
+  }
+  
+  // Center
+  const centerGeo = new THREE.SphereGeometry(0.12, 6, 4);
+  const centerMat = new THREE.MeshLambertMaterial({ color: 0xFFFF00 });
+  const center = new THREE.Mesh(centerGeo, centerMat);
+  center.position.y = 0.85;
+  group.add(center);
+  
+  group.position.set(x, h, z);
+  group.userData = { baseY: h };
+  scene.add(group);
+  return group;
+}
+
+const flowers = [];
+for (let i = 0; i < 80; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.8;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.8;
+  flowers.push(createFlower(x, z));
+}
+
+// --- MUSHROOMS ---
+function createMushroom(x, z) {
+  const group = new THREE.Group();
+  const h = getTerrainHeight(x, z);
+  
+  // Stem
+  const stemGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.5, 8);
+  const stemMat = new THREE.MeshLambertMaterial({ color: 0xFFF8DC });
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = 0.25;
+  group.add(stem);
+  
+  // Cap
+  const capGeo = new THREE.SphereGeometry(0.4, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  const isRed = Math.random() > 0.5;
+  const capMat = new THREE.MeshLambertMaterial({ color: isRed ? 0xFF0000 : 0x8B4513 });
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.y = 0.5;
+  group.add(cap);
+  
+  // White spots on red mushrooms
+  if (isRed) {
+    const spotMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+    for (let s = 0; s < 4; s++) {
+      const spotGeo = new THREE.SphereGeometry(0.06, 4, 4);
+      const spot = new THREE.Mesh(spotGeo, spotMat);
+      const a = (s / 4) * Math.PI * 2 + Math.random() * 0.5;
+      spot.position.set(Math.cos(a) * 0.25, 0.6 + Math.random() * 0.1, Math.sin(a) * 0.25);
+      group.add(spot);
+    }
+  }
+  
+  group.position.set(x, h, z);
+  scene.add(group);
+  return group;
+}
+
+const mushrooms = [];
+const MUSHROOM_EAT_RANGE = 4; // distance to detect mushrooms when eating
+
+for (let i = 0; i < 30; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.7;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.7;
+  mushrooms.push(createMushroom(x, z));
+}
+
+// --- YARN BALLS ---
+function createYarnBall(x, z) {
+  const group = new THREE.Group();
+  const h = getTerrainHeight(x, z);
+  const colors = [0xFF69B4, 0x9370DB, 0xFF6347, 0x00CED1, 0xFFD700];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  
+  const ballGeo = new THREE.SphereGeometry(0.5, 12, 8);
+  const ballMat = new THREE.MeshLambertMaterial({ color });
+  const ball = new THREE.Mesh(ballGeo, ballMat);
+  ball.position.y = 0.5;
+  ball.castShadow = true;
+  group.add(ball);
+  
+  // Yarn string trailing
+  const stringMat = new THREE.MeshBasicMaterial({ color });
+  const stringGeo = new THREE.CylinderGeometry(0.02, 0.02, 2, 4);
+  const string = new THREE.Mesh(stringGeo, stringMat);
+  string.position.set(0.3, 0.3, 0.3);
+  string.rotation.z = Math.PI / 4;
+  group.add(string);
+  
+  group.position.set(x, h, z);
+  group.userData = { baseY: h, bobPhase: Math.random() * Math.PI * 2 };
+  scene.add(group);
+  return group;
+}
+
+const yarnBalls = [];
+for (let i = 0; i < 12; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.6;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.6;
+  yarnBalls.push(createYarnBall(x, z));
+}
+
+// --- FISH TOYS ---
+function createFishToy(x, z) {
+  const group = new THREE.Group();
+  const h = getTerrainHeight(x, z);
+  
+  // Fish body
+  const fishGeo = new THREE.ConeGeometry(0.3, 1.0, 6);
+  const fishMat = new THREE.MeshLambertMaterial({ color: 0xFF8C00 });
+  const fish = new THREE.Mesh(fishGeo, fishMat);
+  fish.rotation.z = Math.PI / 2;
+  fish.position.y = 0.3;
+  group.add(fish);
+  
+  // Tail
+  const tailGeo = new THREE.BoxGeometry(0.4, 0.3, 0.05);
+  const tail = new THREE.Mesh(tailGeo, fishMat);
+  tail.position.set(-0.6, 0.3, 0);
+  group.add(tail);
+  
+  // Eye
+  const eyeGeo = new THREE.SphereGeometry(0.06, 4, 4);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const eye = new THREE.Mesh(eyeGeo, eyeMat);
+  eye.position.set(0.35, 0.4, 0.15);
+  group.add(eye);
+  
+  group.position.set(x, h, z);
+  group.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(group);
+  return group;
+}
+
+for (let i = 0; i < 8; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.5;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.5;
+  createFishToy(x, z);
+}
+
+// --- ROCKS ---
+function createRock(x, z) {
+  const h = getTerrainHeight(x, z);
+  const size = 0.5 + Math.random() * 1.5;
+  const rockGeo = new THREE.DodecahedronGeometry(size, 0);
+  const shade = 0.4 + Math.random() * 0.3;
+  const rockMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(shade, shade, shade) });
+  const rock = new THREE.Mesh(rockGeo, rockMat);
+  rock.position.set(x, h + size * 0.3, z);
+  rock.rotation.set(Math.random(), Math.random(), Math.random());
+  rock.scale.y = 0.6;
+  rock.castShadow = true;
+  rock.receiveShadow = true;
+  scene.add(rock);
+}
+
+for (let i = 0; i < 25; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.8;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.8;
+  createRock(x, z);
+}
+
+// --- LAVENDER PLANTS ---
+const lavenderPlants = [];
+const LAVENDER_EAT_RANGE = 4; // distance to detect lavender when eating
+
+function createLavender(x, z) {
+  const group = new THREE.Group();
+  const h = getTerrainHeight(x, z);
+  
+  // Lavender has multiple stems in a small bush
+  const stemMat = new THREE.MeshLambertMaterial({ color: 0x5A7A3A }); // grey-green stems
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x6B8E4E }); // silvery green leaves
+  const flowerColors = [0x9370DB, 0x8A5CC8, 0x7B68EE, 0xAA7FD8]; // various purples
+  
+  const stemCount = 4 + Math.floor(Math.random() * 4); // 4-7 stems per bush
+  
+  for (let s = 0; s < stemCount; s++) {
+    const stemHeight = 0.8 + Math.random() * 0.5;
+    const stemAngle = (s / stemCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const stemSpread = 0.15 + Math.random() * 0.1;
+    const stemX = Math.cos(stemAngle) * stemSpread;
+    const stemZ = Math.sin(stemAngle) * stemSpread;
+    
+    // Stem (thin cylinder)
+    const stemGeo = new THREE.CylinderGeometry(0.025, 0.03, stemHeight, 4);
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.set(stemX, stemHeight / 2, stemZ);
+    // Slight random lean
+    stem.rotation.x = (Math.random() - 0.5) * 0.15;
+    stem.rotation.z = (Math.random() - 0.5) * 0.15;
+    group.add(stem);
+    
+    // Narrow leaves along the stem (2-3 pairs)
+    for (let l = 0; l < 2; l++) {
+      const leafY = 0.15 + l * 0.2;
+      const leafGeo = new THREE.BoxGeometry(0.02, 0.18, 0.015);
+      
+      const leafL = new THREE.Mesh(leafGeo, leafMat);
+      leafL.position.set(stemX - 0.06, leafY, stemZ);
+      leafL.rotation.z = 0.4;
+      group.add(leafL);
+      
+      const leafR = new THREE.Mesh(leafGeo, leafMat);
+      leafR.position.set(stemX + 0.06, leafY, stemZ);
+      leafR.rotation.z = -0.4;
+      group.add(leafR);
+    }
+    
+    // Flower spike at top (stack of tiny purple spheres tapering upward)
+    const flowerColor = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+    const flowerMat = new THREE.MeshLambertMaterial({ color: flowerColor });
+    const spikeHeight = 0.25 + Math.random() * 0.1;
+    const budCount = 5 + Math.floor(Math.random() * 3);
+    
+    for (let b = 0; b < budCount; b++) {
+      const bt = b / (budCount - 1); // 0=bottom, 1=top of spike
+      const budSize = THREE.MathUtils.lerp(0.045, 0.02, bt); // taper toward top
+      const budGeo = new THREE.SphereGeometry(budSize, 5, 4);
+      const bud = new THREE.Mesh(budGeo, flowerMat);
+      bud.position.set(
+        stemX + (Math.random() - 0.5) * 0.02,
+        stemHeight + bt * spikeHeight,
+        stemZ + (Math.random() - 0.5) * 0.02
+      );
+      group.add(bud);
+    }
+  }
+  
+  // Base foliage (low silvery-green mound)
+  const baseMat = new THREE.MeshLambertMaterial({ color: 0x6B8E4E });
+  const baseGeo = new THREE.SphereGeometry(0.25, 6, 4);
+  const baseMound = new THREE.Mesh(baseGeo, baseMat);
+  baseMound.position.y = 0.1;
+  baseMound.scale.set(1.2, 0.4, 1.2);
+  group.add(baseMound);
+  
+  group.position.set(x, h, z);
+  group.userData = { baseY: h, swayPhase: Math.random() * Math.PI * 2, type: 'lavender' };
+  scene.add(group);
+  return group;
+}
+
+// Place lavender plants
+for (let i = 0; i < 20; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.7;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.7;
+  lavenderPlants.push(createLavender(x, z));
+}
+
+// --- BUTTERFLIES ---
+const butterflies = [];
+const butterflyWingMats = [
+  new THREE.MeshLambertMaterial({ color: 0xFF69B4, side: THREE.DoubleSide }),
+  new THREE.MeshLambertMaterial({ color: 0x87CEEB, side: THREE.DoubleSide }),
+  new THREE.MeshLambertMaterial({ color: 0xFFD700, side: THREE.DoubleSide }),
+  new THREE.MeshLambertMaterial({ color: 0xFF6347, side: THREE.DoubleSide }),
+  new THREE.MeshLambertMaterial({ color: 0x9370DB, side: THREE.DoubleSide }),
+  new THREE.MeshLambertMaterial({ color: 0x00CED1, side: THREE.DoubleSide }),
+];
+
+function createButterfly(x, y, z) {
+  const group = new THREE.Group();
+  const mat = butterflyWingMats[Math.floor(Math.random() * butterflyWingMats.length)];
+  
+  // Body
+  const bodyGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.4, 4);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  const bBody = new THREE.Mesh(bodyGeo, bodyMat);
+  bBody.rotation.x = Math.PI / 2;
+  group.add(bBody);
+  
+  // Left wing
+  const wingGeo = new THREE.PlaneGeometry(0.5, 0.35);
+  const wingL = new THREE.Mesh(wingGeo, mat);
+  wingL.position.set(-0.25, 0, 0);
+  group.add(wingL);
+  
+  // Right wing
+  const wingR = new THREE.Mesh(wingGeo, mat);
+  wingR.position.set(0.25, 0, 0);
+  group.add(wingR);
+  
+  group.position.set(x, y, z);
+  group.userData = {
+    wingL, wingR,
+    centerX: x, centerZ: z,
+    radius: 2 + Math.random() * 5,
+    speed: 0.5 + Math.random() * 1.5,
+    phase: Math.random() * Math.PI * 2,
+    heightBase: y,
+    heightAmp: 0.5 + Math.random() * 1.5,
+    flapSpeed: 8 + Math.random() * 6,
+  };
+  
+  scene.add(group);
+  return group;
+}
+
+for (let i = 0; i < 25; i++) {
+  const x = (Math.random() - 0.5) * WORLD_SIZE * 0.7;
+  const z = (Math.random() - 0.5) * WORLD_SIZE * 0.7;
+  const h = getTerrainHeight(x, z);
+  const y = h + 2 + Math.random() * 3;
+  butterflies.push(createButterfly(x, y, z));
+}
+
+let butterfliesEaten = 0;
+let butterfliesNearby = 0;
+const EAT_RANGE = 5; // distance to eat a butterfly
+
+// Eat animation state
+let eatAnimTimer = 0;
+const EAT_ANIM_DURATION = 0.4; // seconds
+
+function tryEatButterfly() {
+  if (eatAnimTimer > 0) return; // already eating
+  if (isDisgusted) return; // too angry to eat
+  if (isLovingMushroom) return; // busy enjoying mushroom
+  
+  // Check for mushrooms first - Klaus LOVES them!
+  const mushroomIdx = checkMushroomNearby();
+  if (mushroomIdx >= 0) {
+    eatAnimTimer = EAT_ANIM_DURATION;
+    triggerMushroomLove(mushroomIdx);
+    return; // eat mushroom instead, trigger happy reaction
+  }
+  
+  // Check for lavender - Klaus HATES it!
+  if (checkLavenderNearby()) {
+    triggerDisgust();
+    return; // refuse to eat, trigger angry reaction instead
+  }
+  
+  // Find closest butterfly within range
+  let closestIdx = -1;
+  let closestDist = Infinity;
+  
+  for (let i = 0; i < butterflies.length; i++) {
+    const b = butterflies[i];
+    if (b.userData.eaten) continue;
+    const dx = b.position.x - klaus.position.x;
+    const dz = b.position.z - klaus.position.z;
+    const dy = b.position.y - (klaus.position.y + 2); // head height
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist < EAT_RANGE && dist < closestDist) {
+      closestDist = dist;
+      closestIdx = i;
+    }
+  }
+  
+  // Trigger eat animation regardless (cat pounces even if nothing to eat)
+  eatAnimTimer = EAT_ANIM_DURATION;
+  
+  if (closestIdx >= 0) {
+    const b = butterflies[closestIdx];
+    b.userData.eaten = true;
+    scene.remove(b);
+    butterfliesEaten++;
+    document.getElementById('butterfliesEaten').textContent = butterfliesEaten;
+    
+    // Affect meters: eating reduces hunger, increases poop, boosts zoomies
+    hungerMeter = Math.max(0, hungerMeter - HUNGER_EAT_REDUCE);
+    poopMeter = Math.min(100, poopMeter + POOP_EAT_INCREASE);
+    if (!isZooming) zoomieMeter = Math.min(100, zoomieMeter + ZOOMIE_EAT_BOOST);
+  }
+}
+
+function updateButterflies(elapsed) {
+  butterfliesNearby = 0;
+  
+  butterflies.forEach(b => {
+    const d = b.userData;
+    if (d.eaten) return; // skip eaten butterflies
+    
+    // Circular flight path
+    const angle = elapsed * d.speed + d.phase;
+    b.position.x = d.centerX + Math.cos(angle) * d.radius;
+    b.position.z = d.centerZ + Math.sin(angle) * d.radius;
+    b.position.y = d.heightBase + Math.sin(elapsed * 1.5 + d.phase) * d.heightAmp;
+    
+    // Face direction of movement
+    b.rotation.y = angle + Math.PI / 2;
+    
+    // Wing flap
+    const flap = Math.sin(elapsed * d.flapSpeed) * 0.8;
+    d.wingL.rotation.y = flap;
+    d.wingR.rotation.y = -flap;
+    
+    // Check if Klaus is near (within eat range) - track nearby count
+    if (gameState === 'playing') {
+      const dx = b.position.x - klaus.position.x;
+      const dz = b.position.z - klaus.position.z;
+      const dy = b.position.y - (klaus.position.y + 2);
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist < EAT_RANGE) {
+        butterfliesNearby++;
+      }
+    }
+  });
+  
+  document.getElementById('butterfliesFound').textContent = butterfliesNearby;
+}
+
+function updateWorldDetails(elapsed) {
+  // Sway flowers gently
+  flowers.forEach((f, i) => {
+    f.rotation.z = Math.sin(elapsed * 1.2 + i * 0.5) * 0.05;
+    f.rotation.x = Math.cos(elapsed * 0.8 + i * 0.3) * 0.03;
+  });
+  
+  // Sway lavender plants gently (slightly more than flowers - they're taller)
+  lavenderPlants.forEach((lav, i) => {
+    const phase = lav.userData.swayPhase;
+    lav.rotation.z = Math.sin(elapsed * 1.0 + phase) * 0.06;
+    lav.rotation.x = Math.cos(elapsed * 0.7 + phase + 1.0) * 0.04;
+  });
+  
+  // Bob yarn balls
+  yarnBalls.forEach(y => {
+    y.position.y = y.userData.baseY + Math.sin(elapsed * 2 + y.userData.bobPhase) * 0.15;
+  });
+}
+
+// ============================================================
+// INPUT STATE
+// ============================================================
+const input = {
+  moveX: 0,    // -1 to 1 (left/right)
+  moveZ: 0,    // -1 to 1 (up/down, forward/back)
+  sprint: false,
+  jump: false,
+  eat: false,
+  poop: false,
+};
+
+// Keyboard input tracking
+const keysDown = {};
+document.addEventListener('keydown', (e) => {
+  keysDown[e.code] = true;
+  if (e.code === 'Enter' || e.code === 'Space') {
+    e.preventDefault();
+    if (gameState === 'start') startGame();
+  }
+  if (e.code === 'Escape') {
+    if (gameState === 'start') returnToMenu();
+  }
+});
+document.addEventListener('keyup', (e) => {
+  keysDown[e.code] = false;
+});
+
+function updateKeyboardInput() {
+  let kx = 0, kz = 0;
+  if (keysDown['KeyW'] || keysDown['ArrowUp']) kz = -1;
+  if (keysDown['KeyS'] || keysDown['ArrowDown']) kz = 1;
+  if (keysDown['KeyA'] || keysDown['ArrowLeft']) kx = -1;
+  if (keysDown['KeyD'] || keysDown['ArrowRight']) kx = 1;
+  // Only apply keyboard if no gamepad joystick input
+  const gp = navigator.getGamepads()[0];
+  const gpActive = gp && (Math.abs(gp.axes[0]) > 0.2 || Math.abs(gp.axes[1]) > 0.2);
+  if (!gpActive) {
+    input.moveX = kx;
+    input.moveZ = kz;
+  }
+  // Sprint with Shift, Jump with Space, Eat with E, Poop with Q (keyboard)
+  if (keysDown['ShiftLeft'] || keysDown['ShiftRight']) input.sprint = true;
+  if (keysDown['Space'] && gameState === 'playing') input.jump = true;
+  if (keysDown['KeyE'] && gameState === 'playing') input.eat = true;
+  if (keysDown['KeyQ'] && gameState === 'playing') input.poop = true;
+}
+
+// Enhanced gamepad handler (replaces the simple one above for gameplay)
+let action1Pressed = false;
+let action2Pressed = false;
+
+function handleGamepadFull() {
+  const gp = navigator.getGamepads()[0];
+  if (!gp) return;
+
+  // START (btn 3) - start game
+  if (gp.buttons[3]?.pressed && !startPressed) {
+    startPressed = true;
+    if (gameState === 'start') startGame();
+  } else if (!gp.buttons[3]?.pressed) {
+    startPressed = false;
+  }
+
+  // COIN (btn 2) - return to menu
+  if (gp.buttons[2]?.pressed && !coinPressed) {
+    coinPressed = true;
+    if (gameState === 'start') returnToMenu();
+  } else if (!gp.buttons[2]?.pressed) {
+    coinPressed = false;
+  }
+
+  if (gameState !== 'playing') return;
+
+  // Joystick movement (axes 0 = left/right, axes 1 = up/down)
+  const deadzone = 0.2;
+  const ax = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
+  const ay = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+  if (Math.abs(ax) > 0 || Math.abs(ay) > 0) {
+    input.moveX = ax;
+    input.moveZ = ay;
+  }
+
+  // Auto-sprint when joystick is pushed far (>0.85)
+  const joystickMag = Math.sqrt(ax * ax + ay * ay);
+  if (joystickMag > 0.85) {
+    input.sprint = true;
+  }
+
+  // ACTION 1 (btn 8) - Eat / Pounce
+  if (gp.buttons[8]?.pressed && !action1Pressed) {
+    action1Pressed = true;
+    input.eat = true;
+  } else if (!gp.buttons[8]?.pressed) {
+    action1Pressed = false;
+  }
+
+  // ACTION 2 (btn 9) - Jump
+  if (gp.buttons[9]?.pressed && !action2Pressed) {
+    action2Pressed = true;
+    input.jump = true;
+  } else if (!gp.buttons[9]?.pressed) {
+    action2Pressed = false;
+  }
+
+  // Also allow D-pad buttons for movement
+  // UP (btn 7), DOWN (btn 4), LEFT (btn 5), RIGHT (btn 6)
+  if (!ax && !ay) {
+    let dx = 0, dz = 0;
+    if (gp.buttons[7]?.pressed) dz = -1;  // UP
+    if (gp.buttons[4]?.pressed) dz = 1;   // DOWN
+    if (gp.buttons[5]?.pressed) dx = -1;  // LEFT
+    if (gp.buttons[6]?.pressed) dx = 1;   // RIGHT
+    if (dx || dz) {
+      input.moveX = dx;
+      input.moveZ = dz;
+    }
+  }
+}
+
+// ============================================================
+// HUNGER & POOP METER SYSTEM
+// ============================================================
+let hungerMeter = 0;   // 0-100
+let poopMeter = 0;     // 0-100
+const HUNGER_RATE = 100 / 90;       // fills in ~90 seconds
+const HUNGER_EAT_REDUCE = 25;       // eating a butterfly reduces hunger by 25%
+const POOP_EAT_INCREASE = 30;       // eating a butterfly adds 30% poop
+const POOP_PASSIVE_RATE = 100 / 300; // slow passive fill over ~5 min
+const POOP_THRESHOLD = 50;          // minimum poop to manually poop
+
+// Poop animation state
+let poopAnimTimer = 0;
+const POOP_ANIM_DURATION = 2.5; // seconds - dramatic multi-phase animation
+let isPooping = false;
+let poopPhase = 0; // 0=alarm, 1=squat+strain, 2=peak, 3=relief
+const poopAlertEl = document.getElementById('poopAlert');
+const poopCaptionEl = document.getElementById('poopCaption');
+const POOP_CAPTIONS = [
+  "oh no... OH NO...",
+  "it's happening!!!",
+  "MAXIMUM EFFORT",
+  "the struggle is real",
+  "brace yourself...",
+  "code brown! CODE BROWN!",
+  "this is not a drill!",
+];
+
+// Poop objects in the world
+const poopObjects = [];
+const poopMat = new THREE.MeshLambertMaterial({ color: 0x5C3317 });
+const poopHighlightMat = new THREE.MeshLambertMaterial({ color: 0x7B4B2A });
+
+function createPoopObject(x, y, z) {
+  const group = new THREE.Group();
+  
+  // Main lump (bottom)
+  const lump1Geo = new THREE.SphereGeometry(0.25, 8, 6);
+  const lump1 = new THREE.Mesh(lump1Geo, poopMat);
+  lump1.scale.y = 0.6;
+  lump1.position.y = 0.15;
+  lump1.castShadow = true;
+  group.add(lump1);
+  
+  // Middle lump
+  const lump2Geo = new THREE.SphereGeometry(0.2, 8, 6);
+  const lump2 = new THREE.Mesh(lump2Geo, poopMat);
+  lump2.scale.y = 0.6;
+  lump2.position.y = 0.32;
+  lump2.castShadow = true;
+  group.add(lump2);
+  
+  // Top lump (smallest)
+  const lump3Geo = new THREE.SphereGeometry(0.14, 8, 6);
+  const lump3 = new THREE.Mesh(lump3Geo, poopHighlightMat);
+  lump3.scale.y = 0.7;
+  lump3.position.y = 0.46;
+  lump3.castShadow = true;
+  group.add(lump3);
+  
+  // Stink lines (small floating cylinders) - visual flair
+  const stinkMat = new THREE.MeshBasicMaterial({ color: 0x8B7355, transparent: true, opacity: 0.4 });
+  for (let i = 0; i < 3; i++) {
+    const stinkGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4);
+    const stink = new THREE.Mesh(stinkGeo, stinkMat);
+    const angle = (i / 3) * Math.PI * 2;
+    stink.position.set(Math.cos(angle) * 0.15, 0.7 + i * 0.15, Math.sin(angle) * 0.15);
+    stink.rotation.z = Math.sin(angle) * 0.3;
+    group.add(stink);
+  }
+  
+  group.position.set(x, y, z);
+  group.userData = { spawnTime: performance.now() / 1000 };
+  scene.add(group);
+  poopObjects.push(group);
+  return group;
+}
+
+function doPoopAction() {
+  if (isPooping) return;
+  if (poopMeter < POOP_THRESHOLD && poopMeter < 100) return;
+  
+  isPooping = true;
+  poopAnimTimer = POOP_ANIM_DURATION;
+  poopPhase = 0;
+  
+  // Show alert
+  poopAlertEl.style.opacity = '1';
+  poopAlertEl.textContent = '⚠️';
+  setTimeout(() => { poopAlertEl.style.opacity = '0'; }, 600);
+  
+  // Show caption
+  const caption = POOP_CAPTIONS[Math.floor(Math.random() * POOP_CAPTIONS.length)];
+  poopCaptionEl.textContent = caption;
+  poopCaptionEl.style.opacity = '1';
+  
+  // Show sweat drops and mouth
+  sweatL.visible = true;
+  sweatR.visible = true;
+  mouth.visible = true;
+}
+
+function finishPoop() {
+  // Place poop behind Klaus (at tail position in world space)
+  const behindX = klaus.position.x + Math.sin(klausState.rotation) * 2;
+  const behindZ = klaus.position.z + Math.cos(klausState.rotation) * 2;
+  const terrainY = getTerrainHeight(behindX, behindZ);
+  createPoopObject(behindX, terrainY, behindZ);
+  
+  // Reset poop meter
+  poopMeter = 0;
+  
+  // Hide face effects
+  sweatL.visible = false;
+  sweatR.visible = false;
+  mouth.visible = false;
+  mouth.scale.set(1.2, 0.8, 0.5);
+  eyeL.scale.set(1, 1, 1);
+  eyeR.scale.set(1, 1, 1);
+  pupilL.scale.set(1, 1, 1);
+  pupilR.scale.set(1, 1, 1);
+  pupilL.position.set(0, 0, -0.2);
+  pupilR.position.set(0, 0, -0.2);
+  
+  // Hide caption
+  poopCaptionEl.style.opacity = '0';
+  
+  // Big dramatic flash effect
+  const poopFlash = document.getElementById('poopFlash');
+  poopFlash.style.opacity = '1';
+  setTimeout(() => { poopFlash.style.opacity = '0.5'; }, 200);
+  setTimeout(() => { poopFlash.style.opacity = '0'; }, 700);
+  
+  // Show relief emoji
+  poopAlertEl.textContent = '😌💩';
+  poopAlertEl.style.opacity = '1';
+  setTimeout(() => { poopAlertEl.style.opacity = '0'; }, 1000);
+  
+  // Boost zoomie meter after pooping (post-poop zoomies!)
+  if (!isZooming) zoomieMeter = Math.min(100, zoomieMeter + ZOOMIE_POOP_BOOST);
+}
+
+// DOM elements for meters
+const hungerFill = document.getElementById('hungerFill');
+const hungerValue = document.getElementById('hungerValue');
+const poopFill = document.getElementById('poopFill');
+const poopValue = document.getElementById('poopValue');
+const hungerVignette = document.getElementById('hungerVignette');
+
+function updateMeters(delta) {
+  if (gameState !== 'playing') return;
+  
+  // Increase hunger over time
+  hungerMeter = Math.min(100, hungerMeter + HUNGER_RATE * delta);
+  
+  // Increase poop slowly over time (digestion)
+  poopMeter = Math.min(100, poopMeter + POOP_PASSIVE_RATE * delta);
+  
+  // Auto-poop when meter hits 100%
+  if (poopMeter >= 100 && !isPooping) {
+    doPoopAction();
+  }
+  
+  // Update hunger bar display
+  const hungerPct = Math.round(hungerMeter);
+  hungerFill.style.width = hungerPct + '%';
+  hungerValue.textContent = hungerPct + '%';
+  
+  // Hunger bar color: green -> yellow -> orange -> red
+  if (hungerMeter < 40) {
+    hungerFill.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+  } else if (hungerMeter < 65) {
+    hungerFill.style.background = 'linear-gradient(90deg, #8BC34A, #FFC107)';
+  } else if (hungerMeter < 85) {
+    hungerFill.style.background = 'linear-gradient(90deg, #FFC107, #FF9800)';
+  } else {
+    hungerFill.style.background = 'linear-gradient(90deg, #FF9800, #F44336)';
+  }
+  
+  // Update poop bar display
+  const poopPct = Math.round(poopMeter);
+  poopFill.style.width = poopPct + '%';
+  poopValue.textContent = poopPct + '%';
+  
+  // Poop bar color: green -> yellow -> brown
+  if (poopMeter < 40) {
+    poopFill.style.background = 'linear-gradient(90deg, #4CAF50, #8BC34A)';
+  } else if (poopMeter < 70) {
+    poopFill.style.background = 'linear-gradient(90deg, #8BC34A, #A1887F)';
+  } else {
+    poopFill.style.background = 'linear-gradient(90deg, #A1887F, #5D4037)';
+  }
+  
+  // Hunger vignette warning effect (starts at 75%, full at 100%)
+  if (hungerMeter > 75) {
+    const intensity = (hungerMeter - 75) / 25; // 0 to 1
+    hungerVignette.style.opacity = (intensity * 0.8).toString();
+  } else {
+    hungerVignette.style.opacity = '0';
+  }
+}
+
+// Animate poop objects (stink lines float up)
+function updatePoopObjects(elapsed) {
+  poopObjects.forEach(p => {
+    const age = elapsed - p.userData.spawnTime;
+    // Animate stink lines floating upward
+    p.children.forEach((child, idx) => {
+      if (idx >= 3) { // stink lines are children 3, 4, 5
+        child.position.y = (0.7 + (idx - 3) * 0.15) + Math.sin(elapsed * 2 + idx) * 0.1;
+        child.material.opacity = 0.2 + Math.sin(elapsed * 3 + idx) * 0.15;
+      }
+    });
+  });
+}
+
+// ============================================================
+// ZOOMIE METER SYSTEM
+// ============================================================
+let zoomieMeter = 0;    // 0-100
+let isZooming = false;  // currently in zoomie mode
+let zoomieTimer = 0;    // countdown for zoomie duration
+const ZOOMIE_DURATION = 6;           // seconds of zoomie chaos
+const ZOOMIE_PASSIVE_RATE = 100 / 200; // fills in ~200 seconds passively
+const ZOOMIE_EAT_BOOST = 12;        // eating a butterfly adds 12%
+const ZOOMIE_POOP_BOOST = 25;       // pooping adds 25% (post-poop zoomies!)
+const ZOOMIE_SPEED = 40;            // super fast zoomie speed
+const ZOOMIE_TURN_SPEED = 15;       // faster turning during zoomies
+
+// Zoomie auto-direction change state
+let zoomieAutoDir = { x: 0, z: -1 }; // current auto-movement direction
+let zoomieNextDirChange = 0;          // time until next random direction change
+let zoomieDirChangeInterval = 0.3;    // how often direction changes (seconds)
+
+// Zoomie visual state
+let zoomieHueShift = 0;              // for psychedelic hue rotation
+let zoomieJumpTimer = 0;             // random jumps during zoomies
+
+// DOM elements for zoomie meter
+const zoomieFill = document.getElementById('zoomieFill');
+const zoomieValueEl = document.getElementById('zoomieValue');
+const zoomieOverlayEl = document.getElementById('zoomieOverlay');
+const zoomieSpeedlinesEl = document.getElementById('zoomieSpeedlines');
+const zoomieAlertEl = document.getElementById('zoomieAlert');
+
+function triggerZoomies() {
+  if (isZooming || isPooping) return;
+  isZooming = true;
+  zoomieTimer = ZOOMIE_DURATION;
+  zoomieMeter = 0;
+  zoomieHueShift = 0;
+  zoomieNextDirChange = 0;
+  zoomieJumpTimer = 0.5 + Math.random() * 1.0;
+  
+  // Pick initial random direction
+  const angle = Math.random() * Math.PI * 2;
+  zoomieAutoDir.x = Math.cos(angle);
+  zoomieAutoDir.z = Math.sin(angle);
+  
+  // Show alert
+  zoomieAlertEl.textContent = '⚡ ZOOMIES!! ⚡';
+  zoomieAlertEl.style.opacity = '1';
+  setTimeout(() => { zoomieAlertEl.style.opacity = '0'; }, 1500);
+  
+  // Show overlays
+  zoomieOverlayEl.style.opacity = '1';
+  zoomieSpeedlinesEl.style.opacity = '0.8';
+  
+  // Apply hue-rotate to canvas for trippy effect
+  canvas.style.filter = 'saturate(1.8) contrast(1.1)';
+  
+  // Wide eyes for Klaus
+  eyeL.scale.set(1.6, 1.6, 1.6);
+  eyeR.scale.set(1.6, 1.6, 1.6);
+  pupilL.scale.set(0.3, 0.3, 0.3); // tiny pupils = dilated/crazed
+  pupilR.scale.set(0.3, 0.3, 0.3);
+}
+
+function endZoomies() {
+  isZooming = false;
+  zoomieTimer = 0;
+  
+  // Hide overlays
+  zoomieOverlayEl.style.opacity = '0';
+  zoomieSpeedlinesEl.style.opacity = '0';
+  
+  // Reset canvas filter
+  canvas.style.filter = '';
+  
+  // Reset Klaus face
+  eyeL.scale.set(1, 1, 1);
+  eyeR.scale.set(1, 1, 1);
+  pupilL.scale.set(1, 1, 1);
+  pupilR.scale.set(1, 1, 1);
+  pupilL.position.set(0, 0, -0.2);
+  pupilR.position.set(0, 0, -0.2);
+  
+  // Show end alert
+  zoomieAlertEl.textContent = '😮‍💨 phew...';
+  zoomieAlertEl.style.opacity = '1';
+  setTimeout(() => { zoomieAlertEl.style.opacity = '0'; }, 1200);
+}
+
+function updateZoomieMode(delta, elapsed) {
+  if (!isZooming) return;
+  
+  zoomieTimer -= delta;
+  if (zoomieTimer <= 0) {
+    endZoomies();
+    return;
+  }
+  
+  const zoomieProgress = 1 - (zoomieTimer / ZOOMIE_DURATION); // 0 to 1
+  
+  // === AUTO-MOVEMENT: Chaotic direction changes ===
+  zoomieNextDirChange -= delta;
+  if (zoomieNextDirChange <= 0) {
+    // Pick a new random direction, biased by player input
+    const randAngle = Math.random() * Math.PI * 2;
+    // Mix random direction with player input (30% player, 70% random)
+    const playerMix = 0.3;
+    zoomieAutoDir.x = input.moveX * playerMix + Math.cos(randAngle) * (1 - playerMix);
+    zoomieAutoDir.z = input.moveZ * playerMix + Math.sin(randAngle) * (1 - playerMix);
+    // Normalize
+    const len = Math.sqrt(zoomieAutoDir.x * zoomieAutoDir.x + zoomieAutoDir.z * zoomieAutoDir.z);
+    if (len > 0.01) {
+      zoomieAutoDir.x /= len;
+      zoomieAutoDir.z /= len;
+    } else {
+      zoomieAutoDir.x = 1;
+      zoomieAutoDir.z = 0;
+    }
+    // Vary the interval for unpredictability
+    zoomieNextDirChange = 0.2 + Math.random() * 0.5;
+  }
+  
+  // === RANDOM JUMPS ===
+  zoomieJumpTimer -= delta;
+  if (zoomieJumpTimer <= 0 && !klausState.isJumping) {
+    klausState.isJumping = true;
+    klausState.jumpVelocity = JUMP_FORCE * (0.6 + Math.random() * 0.6);
+    zoomieJumpTimer = 0.8 + Math.random() * 1.5;
+  }
+  
+  // === PSYCHEDELIC VISUAL EFFECTS ===
+  zoomieHueShift += delta * 200; // rotate hue fast
+  if (zoomieHueShift > 360) zoomieHueShift -= 360;
+  canvas.style.filter = `saturate(1.8) contrast(1.1) hue-rotate(${zoomieHueShift}deg)`;
+  
+  // Pulsing speed lines
+  const speedPulse = 0.5 + Math.sin(elapsed * 8) * 0.3;
+  zoomieSpeedlinesEl.style.opacity = speedPulse.toString();
+  
+  // Pulsing overlay color
+  const overlayPulse = 0.6 + Math.sin(elapsed * 5) * 0.4;
+  zoomieOverlayEl.style.opacity = overlayPulse.toString();
+  
+  // === KLAUS FACE DURING ZOOMIES ===
+  // Eyes jitter wildly
+  const eyeJitter = 0.08;
+  pupilL.position.set(
+    (Math.random() - 0.5) * eyeJitter,
+    (Math.random() - 0.5) * eyeJitter,
+    -0.2
+  );
+  pupilR.position.set(
+    (Math.random() - 0.5) * eyeJitter,
+    (Math.random() - 0.5) * eyeJitter,
+    -0.2
+  );
+  
+  // Ears go flat back (alert/excited)
+  earL.rotation.z = -0.2 - 0.4 + Math.sin(elapsed * 12) * 0.1;
+  earR.rotation.z = 0.2 + 0.4 + Math.cos(elapsed * 12) * 0.1;
+  
+  // Fade out effects near the end (last 1 second)
+  if (zoomieTimer < 1.0) {
+    const fadeOut = zoomieTimer; // 1.0 -> 0.0
+    canvas.style.filter = `saturate(${1 + fadeOut * 0.8}) contrast(${1 + fadeOut * 0.1}) hue-rotate(${zoomieHueShift * fadeOut}deg)`;
+    zoomieSpeedlinesEl.style.opacity = (speedPulse * fadeOut).toString();
+    zoomieOverlayEl.style.opacity = (overlayPulse * fadeOut).toString();
+  }
+}
+
+function updateZoomieMeter(delta) {
+  if (gameState !== 'playing') return;
+  if (isZooming) {
+    // During zoomies, meter shows remaining time as a draining bar
+    const remaining = (zoomieTimer / ZOOMIE_DURATION) * 100;
+    zoomieFill.style.width = remaining + '%';
+    zoomieValueEl.textContent = '⚡⚡⚡';
+    zoomieFill.style.background = 'linear-gradient(90deg, #FF00FF, #00FFFF, #FFD700)';
+    return;
+  }
+  
+  // Passive fill (not during zoomies)
+  zoomieMeter = Math.min(100, zoomieMeter + ZOOMIE_PASSIVE_RATE * delta);
+  
+  // Trigger zoomies at 100%
+  if (zoomieMeter >= 100 && !isPooping) {
+    triggerZoomies();
+    return;
+  }
+  
+  // Update display
+  const zoomiePct = Math.round(zoomieMeter);
+  zoomieFill.style.width = zoomiePct + '%';
+  zoomieValueEl.textContent = zoomiePct + '%';
+  
+  // Color: blue -> purple -> electric rainbow
+  if (zoomieMeter < 40) {
+    zoomieFill.style.background = 'linear-gradient(90deg, #2196F3, #42A5F5)';
+  } else if (zoomieMeter < 70) {
+    zoomieFill.style.background = 'linear-gradient(90deg, #42A5F5, #9C27B0)';
+  } else if (zoomieMeter < 90) {
+    zoomieFill.style.background = 'linear-gradient(90deg, #9C27B0, #FF00FF)';
+  } else {
+    // Near full: rainbow pulsing
+    zoomieFill.style.background = 'linear-gradient(90deg, #FF00FF, #00FFFF, #FFD700)';
+  }
+}
+
+// ============================================================
+// MUSHROOM LOVE SYSTEM - Klaus LOVES mushrooms! 😻🍄
+// ============================================================
+let isLovingMushroom = false;
+let mushroomLoveTimer = 0;
+const MUSHROOM_LOVE_DURATION = 2.0; // seconds of happy purring bliss
+const MUSHROOM_HUNGER_REDUCE = 35;  // mushrooms are MORE filling than butterflies!
+const MUSHROOM_POOP_INCREASE = 20;  // less poop than butterflies (easier to digest)
+const MUSHROOM_ZOOMIE_BOOST = 8;    // small zoomie boost
+let mushroomLoveCamBlend = 0;       // camera blend for love reaction
+let mushroomsEaten = 0;
+
+const mushroomLoveFlashEl = document.getElementById('mushroomLoveFlash');
+const mushroomLoveAlertEl = document.getElementById('mushroomLoveAlert');
+const mushroomLoveCaptionEl = document.getElementById('mushroomLoveCaption');
+const mushroomHeartsContainer = document.getElementById('mushroomHeartsContainer');
+
+const MUSHROOM_LOVE_CAPTIONS = [
+  "MUSHROOM!! 😻",
+  "Klaus LOVES mushrooms!",
+  "om nom nom nom~",
+  "*happy purring*",
+  "the BEST snack!",
+  "more... MORE!",
+  "absolutely DIVINE.",
+  "purrfection~ 🍄",
+  "*chef's kiss*",
+  "yummy yummy yummy!",
+];
+
+function checkMushroomNearby() {
+  // Find closest non-eaten mushroom within range
+  let closestDist = Infinity;
+  let closestIdx = -1;
+  for (let i = 0; i < mushrooms.length; i++) {
+    const m = mushrooms[i];
+    if (m.userData.eaten) continue;
+    const dx = m.position.x - klaus.position.x;
+    const dz = m.position.z - klaus.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < MUSHROOM_EAT_RANGE && dist < closestDist) {
+      closestDist = dist;
+      closestIdx = i;
+    }
+  }
+  return closestIdx;
+}
+
+function spawnFloatingHearts() {
+  // Spawn several floating heart emojis from the center of the screen
+  const hearts = ['❤️', '💕', '💖', '💗', '🍄', '😻'];
+  for (let i = 0; i < 8; i++) {
+    setTimeout(() => {
+      const heart = document.createElement('div');
+      heart.className = 'floating-heart';
+      heart.textContent = hearts[Math.floor(Math.random() * hearts.length)];
+      heart.style.left = (30 + Math.random() * 40) + '%';
+      heart.style.top = (40 + Math.random() * 30) + '%';
+      heart.style.fontSize = (30 + Math.random() * 30) + 'px';
+      mushroomHeartsContainer.appendChild(heart);
+      // Remove after animation completes
+      setTimeout(() => { heart.remove(); }, 2000);
+    }, i * 150); // stagger the hearts
+  }
+}
+
+function triggerMushroomLove(mushroomIdx) {
+  if (isLovingMushroom || isPooping || isZooming || isDisgusted) return;
+  
+  // Eat the mushroom
+  const m = mushrooms[mushroomIdx];
+  m.userData.eaten = true;
+  scene.remove(m);
+  mushroomsEaten++;
+  
+  // Affect meters: mushrooms are Klaus's FAVORITE food
+  hungerMeter = Math.max(0, hungerMeter - MUSHROOM_HUNGER_REDUCE);
+  poopMeter = Math.min(100, poopMeter + MUSHROOM_POOP_INCREASE);
+  if (!isZooming) zoomieMeter = Math.min(100, zoomieMeter + MUSHROOM_ZOOMIE_BOOST);
+  
+  // Update eaten counter (counts all food)
+  butterfliesEaten++;
+  document.getElementById('butterfliesEaten').textContent = butterfliesEaten;
+  
+  isLovingMushroom = true;
+  mushroomLoveTimer = MUSHROOM_LOVE_DURATION;
+  
+  // Show love alert emoji
+  mushroomLoveAlertEl.textContent = '😻🍄';
+  mushroomLoveAlertEl.style.opacity = '1';
+  setTimeout(() => { mushroomLoveAlertEl.style.opacity = '0'; }, 1000);
+  
+  // Show love caption
+  const caption = MUSHROOM_LOVE_CAPTIONS[Math.floor(Math.random() * MUSHROOM_LOVE_CAPTIONS.length)];
+  mushroomLoveCaptionEl.textContent = caption;
+  mushroomLoveCaptionEl.style.opacity = '1';
+  
+  // Pink love flash
+  mushroomLoveFlashEl.style.opacity = '0.7';
+  setTimeout(() => { mushroomLoveFlashEl.style.opacity = '0.2'; }, 400);
+  
+  // Spawn floating hearts
+  spawnFloatingHearts();
+  
+  // Happy face: eyes go to happy squints, show blissful expression
+  eyeL.scale.set(1.3, 0.4, 1.0); // happy squint
+  eyeR.scale.set(1.3, 0.4, 1.0);
+  pupilL.scale.set(1.5, 1.5, 1.5); // big dilated happy pupils
+  pupilR.scale.set(1.5, 1.5, 1.5);
+}
+
+function finishMushroomLove() {
+  isLovingMushroom = false;
+  mushroomLoveTimer = 0;
+  
+  // Reset face
+  eyeL.scale.set(1, 1, 1);
+  eyeR.scale.set(1, 1, 1);
+  pupilL.scale.set(1, 1, 1);
+  pupilR.scale.set(1, 1, 1);
+  pupilL.position.set(0, 0, -0.2);
+  pupilR.position.set(0, 0, -0.2);
+  earL.rotation.z = -0.2;
+  earR.rotation.z = 0.2;
+  body.position.y = 1.8;
+  head.position.set(0, 0.6, -2.2);
+  head.rotation.x = 0;
+  head.rotation.z = 0;
+  nose.position.set(0, 0.15, -0.35);
+  
+  // Hide caption and flash
+  mushroomLoveCaptionEl.style.opacity = '0';
+  mushroomLoveFlashEl.style.opacity = '0';
+  
+  // Show satisfied emoji
+  mushroomLoveAlertEl.textContent = '😸✨';
+  mushroomLoveAlertEl.style.opacity = '1';
+  setTimeout(() => { mushroomLoveAlertEl.style.opacity = '0'; }, 1000);
+}
+
+function updateMushroomLoveAnimation(delta, elapsed) {
+  if (!isLovingMushroom) return;
+  
+  mushroomLoveTimer -= delta;
+  const loveProgress = 1 - (mushroomLoveTimer / MUSHROOM_LOVE_DURATION);
+  // Phases: 0.0-0.15 = excited pounce, 0.15-0.7 = blissful munching, 0.7-1.0 = satisfied purr
+  
+  // === BLISS ENVELOPE ===
+  let bliss;
+  if (loveProgress < 0.15) {
+    bliss = loveProgress / 0.15; // ramp up to full bliss
+  } else if (loveProgress < 0.7) {
+    bliss = 1.0; // peak happiness
+  } else {
+    bliss = 1.0 - ((loveProgress - 0.7) / 0.3); // slowly come down
+  }
+  
+  // === BODY: Happy kneading/purring motion ===
+  // Body lowers slightly (settling down to enjoy the mushroom)
+  body.position.y = 1.8 - bliss * 0.2;
+  // Front paws do a gentle kneading motion (alternating)
+  const kneadSpeed = 6;
+  legFL.rotation.x = Math.sin(elapsed * kneadSpeed) * 0.15 * bliss;
+  legFR.rotation.x = Math.sin(elapsed * kneadSpeed + Math.PI) * 0.15 * bliss;
+  // Back legs relaxed
+  legBL.rotation.x = bliss * 0.05;
+  legBR.rotation.x = bliss * 0.05;
+  
+  // === HEAD: Happy nuzzling/munching ===
+  if (loveProgress < 0.15) {
+    // Excited lunge toward mushroom
+    const lunge = loveProgress / 0.15;
+    head.position.z = -2.2 - lunge * 0.4;
+    head.position.y = 0.6 - lunge * 0.3;
+    head.rotation.x = lunge * 0.3;
+  } else if (loveProgress < 0.7) {
+    // Happy munching - gentle head bob
+    head.position.z = -2.2 - 0.2;
+    head.position.y = 0.6 - 0.15 + Math.sin(elapsed * 8) * 0.05 * bliss;
+    head.rotation.x = 0.15 + Math.sin(elapsed * 8) * 0.08 * bliss; // nom nom motion
+    // Gentle happy head tilt side to side
+    head.rotation.z = Math.sin(elapsed * 3) * 0.1 * bliss;
+  } else {
+    // Satisfied - head comes back up, slight tilt
+    const satisfiedT = (loveProgress - 0.7) / 0.3;
+    head.position.z = -2.2 - 0.2 * (1 - satisfiedT);
+    head.position.y = 0.6 - 0.15 * (1 - satisfiedT);
+    head.rotation.x = 0.15 * (1 - satisfiedT);
+    head.rotation.z = Math.sin(elapsed * 2) * 0.05 * (1 - satisfiedT);
+  }
+  
+  // === TAIL: Happy upright with gentle slow sway (content cat) ===
+  tailGroup.rotation.x = -0.6 - bliss * 0.3; // tail held high = happy
+  for (let i = 0; i < tailSegments.length; i++) {
+    const t = i / (tailSegments.length - 1);
+    // Slow, gentle, content sway
+    const swaySpeed = 3;
+    const swayAmp = bliss * THREE.MathUtils.lerp(0.03, 0.2, t);
+    tailSegments[i].rotation.y = Math.sin(elapsed * swaySpeed + i * 0.4) * swayAmp;
+    tailSegments[i].rotation.x = -bliss * 0.05; // slight upward curl
+  }
+  
+  // === EARS: Perked forward (happy/interested) ===
+  earL.rotation.z = -0.2 + bliss * 0.15; // ears forward = happy
+  earR.rotation.z = 0.2 - bliss * 0.15;
+  // Gentle ear wiggles
+  earL.rotation.z += Math.sin(elapsed * 4) * 0.03 * bliss;
+  earR.rotation.z += Math.cos(elapsed * 4) * 0.03 * bliss;
+  
+  // === FACE: Pure bliss ===
+  // Eyes: happy squints that pulse with joy
+  const squintPulse = 0.35 + Math.sin(elapsed * 5) * 0.08 * bliss;
+  eyeL.scale.set(1.3 * bliss + (1 - bliss), squintPulse * bliss + (1 - bliss), 1.0);
+  eyeR.scale.set(1.3 * bliss + (1 - bliss), squintPulse * bliss + (1 - bliss), 1.0);
+  
+  // Pupils: big and dilated (happy/relaxed)
+  const happyPupilScale = THREE.MathUtils.lerp(1.0, 1.5, bliss);
+  pupilL.scale.set(happyPupilScale, happyPupilScale, happyPupilScale);
+  pupilR.scale.set(happyPupilScale, happyPupilScale, happyPupilScale);
+  pupilL.position.set(0, 0, -0.2);
+  pupilR.position.set(0, 0, -0.2);
+  
+  // Nose wiggles with delight
+  nose.position.set(
+    Math.sin(elapsed * 6) * 0.02 * bliss,
+    0.15,
+    -0.35
+  );
+  
+  // === PURRING VIBRATION: Gentle body rumble ===
+  if (bliss > 0.3) {
+    const purr = 0.008 * bliss;
+    klaus.position.x += (Math.random() - 0.5) * purr;
+    klaus.position.z += (Math.random() - 0.5) * purr;
+  }
+  
+  // === PINK FLASH: Warm glow pulses ===
+  if (loveProgress < 0.15) {
+    mushroomLoveFlashEl.style.opacity = (0.5 * (loveProgress / 0.15)).toString();
+  } else if (loveProgress < 0.7) {
+    const lovePulse = 0.15 + Math.sin(elapsed * 4) * 0.1;
+    mushroomLoveFlashEl.style.opacity = lovePulse.toString();
+  } else {
+    const fadeOut = 1.0 - ((loveProgress - 0.7) / 0.3);
+    mushroomLoveFlashEl.style.opacity = (fadeOut * 0.15).toString();
+  }
+  
+  // === SECOND CAPTION at peak bliss ===
+  if (loveProgress > 0.35 && loveProgress < 0.37) {
+    const secondCaptions = ["*purrrrrr*", "so good~", "🍄💕", "more please!", "*happy chomps*"];
+    mushroomLoveCaptionEl.textContent = secondCaptions[Math.floor(Math.random() * secondCaptions.length)];
+  }
+  
+  // Spawn more hearts during peak bliss
+  if (loveProgress > 0.3 && loveProgress < 0.32) {
+    spawnFloatingHearts();
+  }
+  
+  if (mushroomLoveTimer <= 0) {
+    finishMushroomLove();
+  }
+}
+
+// ============================================================
+// LAVENDER DISGUST SYSTEM - Klaus HATES lavender! >:<
+// ============================================================
+let isDisgusted = false;
+let disgustAnimTimer = 0;
+const DISGUST_ANIM_DURATION = 2.5; // seconds - dramatic angry scowl
+const disgustAlertEl = document.getElementById('disgustAlert');
+const disgustCaptionEl = document.getElementById('disgustCaption');
+const disgustFlashEl = document.getElementById('disgustFlash');
+let disgustCamBlend = 0; // 0 = normal cam, 1 = face cam (like poop cam)
+
+const DISGUST_CAPTIONS = [
+  "NO.",
+  "absolutely NOT.",
+  "how DARE you.",
+  "Klaus HATES lavender!",
+  "disgusting.",
+  ">:(",
+  "are you SERIOUS right now?",
+  "I will remember this.",
+  "UNACCEPTABLE.",
+  "do NOT.",
+];
+
+function checkLavenderNearby() {
+  // Check if any lavender plant is within eat range
+  let closestDist = Infinity;
+  let closestIdx = -1;
+  for (let i = 0; i < lavenderPlants.length; i++) {
+    const lav = lavenderPlants[i];
+    const dx = lav.position.x - klaus.position.x;
+    const dz = lav.position.z - klaus.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < LAVENDER_EAT_RANGE && dist < closestDist) {
+      closestDist = dist;
+      closestIdx = i;
+    }
+  }
+  return closestIdx >= 0;
+}
+
+// Angry eyebrow meshes (hidden by default, shown during disgust)
+const angryBrowMat = new THREE.MeshBasicMaterial({ color: 0xFF2200 });
+const browGeoL = new THREE.BoxGeometry(0.45, 0.08, 0.12);
+const angryBrowL = new THREE.Mesh(browGeoL, angryBrowMat);
+angryBrowL.position.set(-0.5, 0.65, -0.92);
+angryBrowL.rotation.z = 0.35; // angled down toward center = angry V shape
+angryBrowL.visible = false;
+head.add(angryBrowL);
+const browGeoR = new THREE.BoxGeometry(0.45, 0.08, 0.12);
+const angryBrowR = new THREE.Mesh(browGeoR, angryBrowMat);
+angryBrowR.position.set(0.5, 0.65, -0.92);
+angryBrowR.rotation.z = -0.35; // angled down toward center = angry V shape
+angryBrowR.visible = false;
+head.add(angryBrowR);
+
+// Anger vein (throbbing cross mark on forehead - classic anime anger mark)
+const veinMat = new THREE.MeshBasicMaterial({ color: 0xFF3333 });
+function makeVeinArm(len) {
+  const g = new THREE.BoxGeometry(len, 0.06, 0.06);
+  return new THREE.Mesh(g, veinMat);
+}
+const angerVeinGroup = new THREE.Group();
+const vArm1 = makeVeinArm(0.3);
+const vArm2 = makeVeinArm(0.3);
+vArm2.rotation.z = Math.PI / 2;
+angerVeinGroup.add(vArm1);
+angerVeinGroup.add(vArm2);
+// Small extra cross offset for the classic 4-prong look
+const vArm3 = makeVeinArm(0.15);
+vArm3.position.set(0.1, 0.1, 0);
+vArm3.rotation.z = Math.PI / 4;
+angerVeinGroup.add(vArm3);
+angerVeinGroup.position.set(0.6, 0.9, -0.4);
+angerVeinGroup.visible = false;
+head.add(angerVeinGroup);
+
+function triggerDisgust() {
+  if (isDisgusted || isPooping || isZooming) return;
+  
+  isDisgusted = true;
+  disgustAnimTimer = DISGUST_ANIM_DURATION;
+  
+  // Show angry alert emoji
+  disgustAlertEl.textContent = '😾';
+  disgustAlertEl.style.opacity = '1';
+  setTimeout(() => { disgustAlertEl.style.opacity = '0'; }, 800);
+  
+  // Show angry caption
+  const caption = DISGUST_CAPTIONS[Math.floor(Math.random() * DISGUST_CAPTIONS.length)];
+  disgustCaptionEl.textContent = caption;
+  disgustCaptionEl.style.opacity = '1';
+  
+  // Red flash
+  disgustFlashEl.style.opacity = '0.8';
+  setTimeout(() => { disgustFlashEl.style.opacity = '0.3'; }, 300);
+  
+  // Show mouth, angry eyebrows, and anger vein
+  mouth.visible = true;
+  angryBrowL.visible = true;
+  angryBrowR.visible = true;
+  angerVeinGroup.visible = true;
+}
+
+function finishDisgust() {
+  isDisgusted = false;
+  disgustAnimTimer = 0;
+  
+  // Reset face
+  mouth.visible = false;
+  mouth.scale.set(1.2, 0.8, 0.5);
+  mouth.position.set(0, -0.15, -0.35);
+  eyeL.scale.set(1, 1, 1);
+  eyeR.scale.set(1, 1, 1);
+  pupilL.scale.set(1, 1, 1);
+  pupilR.scale.set(1, 1, 1);
+  pupilL.position.set(0, 0, -0.2);
+  pupilR.position.set(0, 0, -0.2);
+  earL.rotation.z = -0.2;
+  earR.rotation.z = 0.2;
+  body.position.y = 1.8;
+  head.position.set(0, 0.6, -2.2);
+  head.rotation.x = 0;
+  head.rotation.z = 0;
+  
+  // Hide angry eyebrows and anger vein
+  angryBrowL.visible = false;
+  angryBrowR.visible = false;
+  angerVeinGroup.visible = false;
+  
+  // Reset nose
+  nose.position.set(0, 0.15, -0.35);
+  
+  // Hide caption and flash
+  disgustCaptionEl.style.opacity = '0';
+  disgustFlashEl.style.opacity = '0';
+  
+  // Show dismissive huff emoji
+  disgustAlertEl.textContent = '😤';
+  disgustAlertEl.style.opacity = '1';
+  setTimeout(() => { disgustAlertEl.style.opacity = '0'; }, 1000);
+}
+
+function updateDisgustAnimation(delta, elapsed) {
+  if (!isDisgusted) return;
+  
+  disgustAnimTimer -= delta;
+  const disgustProgress = 1 - (disgustAnimTimer / DISGUST_ANIM_DURATION);
+  // Phases: 0.0-0.12 = shocked recoil, 0.12-0.3 = building rage, 0.3-0.75 = MAXIMUM ANGER, 0.75-1.0 = huff away
+  
+  // === RIGIDITY ENVELOPE ===
+  let rigidity;
+  if (disgustProgress < 0.12) {
+    rigidity = disgustProgress / 0.12; // snap to rigid
+  } else if (disgustProgress < 0.75) {
+    rigidity = 1.0; // hold maximum anger
+  } else {
+    rigidity = 1.0 - ((disgustProgress - 0.75) / 0.25); // slowly relax
+  }
+  
+  // === BODY: Puff up HUGE with indignation, then dramatic head turn ===
+  // Body rises up (cat making itself look big and intimidating)
+  body.position.y = 1.8 + rigidity * 0.35;
+  // Front legs stiffen and push forward (bracing stance)
+  legFL.rotation.x = -rigidity * 0.25;
+  legFR.rotation.x = -rigidity * 0.25;
+  // Back legs planted wide
+  legBL.rotation.x = rigidity * 0.15;
+  legBR.rotation.x = rigidity * 0.15;
+  
+  // === HEAD: Dramatic expressions ===
+  // Initial recoil: head jerks back, then leans forward menacingly
+  if (disgustProgress < 0.12) {
+    // Recoil back in shock
+    const recoil = disgustProgress / 0.12;
+    head.position.y = 0.6 + recoil * 0.4;
+    head.position.z = -2.2 + recoil * 0.3; // pull back
+    head.rotation.x = recoil * 0.2; // tilt back
+  } else if (disgustProgress < 0.75) {
+    // Lean forward menacingly, looking down with contempt
+    head.position.y = 0.6 + 0.2;
+    head.position.z = -2.2 - 0.15; // lean forward slightly
+    head.rotation.x = -0.2; // tilt down = looking down nose at you
+    // Slow angry head shake (side to side "no no no")
+    const headShake = Math.sin(elapsed * 6) * 0.08 * rigidity;
+    head.rotation.z = headShake;
+  } else {
+    // Huff: dramatic head turn away
+    const huffT = (disgustProgress - 0.75) / 0.25;
+    head.position.y = 0.6 + (1 - huffT) * 0.2;
+    head.position.z = -2.2;
+    head.rotation.x = -0.1 * (1 - huffT);
+    head.rotation.z = huffT * 0.3; // turn away dismissively
+  }
+  
+  // === TAIL: Puffed up HUGE and lashing VIOLENTLY ===
+  tailGroup.rotation.x = -0.8 - rigidity * 0.5; // tail straight up, angry
+  for (let i = 0; i < tailSegments.length; i++) {
+    const t = i / (tailSegments.length - 1);
+    // Fast angry lashing - sharp whip-like movements
+    const lashSpeed = 12;
+    const lashAmp = rigidity * THREE.MathUtils.lerp(0.08, 0.55, t);
+    tailSegments[i].rotation.y = Math.sin(elapsed * lashSpeed + i * 0.6) * lashAmp;
+    tailSegments[i].rotation.x = -rigidity * 0.2;
+  }
+  
+  // === EARS: Flattened HARD back (maximum angry cat) ===
+  earL.rotation.z = -0.2 - rigidity * 0.85;
+  earR.rotation.z = 0.2 + rigidity * 0.85;
+  // Ears also twitch with rage
+  if (rigidity > 0.5) {
+    earL.rotation.z += Math.sin(elapsed * 15) * 0.05;
+    earR.rotation.z += Math.cos(elapsed * 15) * 0.05;
+  }
+  
+  // === FACE: The ULTIMATE >:< scowl ===
+  
+  // Angry eyebrows get MORE angled during peak rage
+  if (disgustProgress > 0.12 && disgustProgress < 0.75) {
+    const rageIntensity = Math.min(1, (disgustProgress - 0.12) / 0.18);
+    // Eyebrows angle down harder and throb
+    const browAnger = 0.35 + rageIntensity * 0.25 + Math.sin(elapsed * 8) * 0.05;
+    angryBrowL.rotation.z = browAnger;
+    angryBrowR.rotation.z = -browAnger;
+    // Eyebrows push down closer to eyes
+    angryBrowL.position.y = 0.65 - rageIntensity * 0.1;
+    angryBrowR.position.y = 0.65 - rageIntensity * 0.1;
+  }
+  
+  // Anger vein THROBS
+  if (angerVeinGroup.visible) {
+    const throb = 1.0 + Math.sin(elapsed * 10) * 0.3;
+    angerVeinGroup.scale.set(throb, throb, throb);
+    // Vein gets redder/brighter at peak
+    const veinBright = 0.8 + Math.sin(elapsed * 6) * 0.2;
+    veinMat.color.setRGB(1, veinBright * 0.2, veinBright * 0.2);
+  }
+  
+  // Eyes: EXTREME narrow angry slits
+  const angryEyeY = THREE.MathUtils.lerp(1.0, 0.25, rigidity); // super squished
+  const angryEyeX = THREE.MathUtils.lerp(1.0, 1.5, rigidity);  // extra wide
+  eyeL.scale.set(angryEyeX, angryEyeY, 1.0);
+  eyeR.scale.set(angryEyeX, angryEyeY, 1.0);
+  
+  // Pupils: tiny pinpricks of RAGE staring at camera
+  const angryPupilScale = THREE.MathUtils.lerp(1.0, 0.5, rigidity);
+  pupilL.scale.set(angryPupilScale, angryPupilScale, angryPupilScale);
+  pupilR.scale.set(angryPupilScale, angryPupilScale, angryPupilScale);
+  // Pupils dead center = death stare
+  pupilL.position.set(0, 0, -0.2);
+  pupilR.position.set(0, 0, -0.2);
+  
+  // Mouth: tight angry grimace that twitches
+  const mouthTwitch = Math.sin(elapsed * 12) * 0.1 * rigidity;
+  mouth.scale.set(2.2 * rigidity, (0.2 + mouthTwitch) * rigidity, 0.4);
+  mouth.position.set(mouthTwitch * 0.05, -0.22, -0.35);
+  
+  // Nose wrinkle (push nose up slightly = snarl)
+  nose.position.set(0, 0.15 + rigidity * 0.06, -0.35);
+  
+  // === ANGRY TREMBLE: Builds up, gets more intense ===
+  if (disgustProgress > 0.12 && disgustProgress < 0.75) {
+    // Rage builds: tremble gets worse over time
+    const rageBuildup = Math.min(1, (disgustProgress - 0.12) / 0.3);
+    const rageTremble = 0.015 + rageBuildup * 0.035;
+    klaus.position.x += (Math.random() - 0.5) * rageTremble;
+    klaus.position.z += (Math.random() - 0.5) * rageTremble;
+  }
+  
+  // === FLASH EFFECT: Dramatic red pulses ===
+  if (disgustProgress < 0.12) {
+    // Initial shock flash
+    disgustFlashEl.style.opacity = (0.6 * (1 - disgustProgress / 0.12)).toString();
+  } else if (disgustProgress < 0.75) {
+    // Pulsing red rage
+    const flashPulse = 0.15 + Math.sin(elapsed * 5) * 0.12;
+    disgustFlashEl.style.opacity = flashPulse.toString();
+  } else {
+    const fadeOut = 1.0 - ((disgustProgress - 0.75) / 0.25);
+    disgustFlashEl.style.opacity = (fadeOut * 0.15).toString();
+  }
+  
+  // === SECOND CAPTION at peak rage ===
+  if (disgustProgress > 0.4 && disgustProgress < 0.42) {
+    const secondCaptions = [">:<", "HMPH!", "*angry cat noises*", "the AUDACITY", "NEVER."];
+    disgustCaptionEl.textContent = secondCaptions[Math.floor(Math.random() * secondCaptions.length)];
+  }
+  
+  if (disgustAnimTimer <= 0) {
+    finishDisgust();
+  }
+}
+
+// ============================================================
+// KLAUS MOVEMENT & ANIMATION
+// ============================================================
+const WALK_SPEED = 8;
+const SPRINT_SPEED = 15;
+const TURN_SPEED = 8;
+const JUMP_FORCE = 10;
+const GRAVITY = 25;
+const WORLD_BOUND = WORLD_SIZE / 2 - 5;
+const KLAUS_GROUND_OFFSET = 0.25; // raise Klaus so paws sit on ground, not through it
+
+// Camera follow settings
+const CAM_DISTANCE = 12;
+const CAM_HEIGHT = 6;
+const CAM_LOOK_HEIGHT = 2;
+const CAM_SMOOTH = 4;
+
+function updateKlaus(delta, elapsed) {
+  if (gameState !== 'playing') return;
+
+  // Hunger slowdown: at 100% hunger, speed is halved; starts slowing at 75%
+  let hungerSlowdown = 1;
+  if (hungerMeter > 75) {
+    hungerSlowdown = 1 - ((hungerMeter - 75) / 25) * 0.5; // 1.0 -> 0.5
+  }
+
+  // Can't move while pooping, disgusted, or loving mushroom
+  const canMove = !isPooping && !isDisgusted && !isLovingMushroom;
+
+  // Zoomie mode overrides speed and movement
+  const baseSpeed = isZooming ? ZOOMIE_SPEED : (input.sprint ? SPRINT_SPEED : WALK_SPEED);
+  const speed = isZooming ? ZOOMIE_SPEED : (baseSpeed * hungerSlowdown);
+  // During zoomies, use auto-direction instead of player input
+  const mx = isZooming ? zoomieAutoDir.x : (canMove ? input.moveX : 0);
+  const mz = isZooming ? zoomieAutoDir.z : (canMove ? input.moveZ : 0);
+  const inputMag = Math.sqrt(mx * mx + mz * mz);
+  const moving = inputMag > 0.1;
+
+  // Camera-relative movement: transform joystick input using camera's orientation
+  // Get camera forward and right vectors projected onto the XZ ground plane
+  const camForward = new THREE.Vector3();
+  camera.getWorldDirection(camForward);
+  camForward.y = 0;
+  camForward.normalize();
+
+  const camRight = new THREE.Vector3();
+  camRight.crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
+
+  // World-space movement direction from joystick input
+  // mx = joystick left/right (screen right = camRight)
+  // mz = joystick up/down (screen up = -mz = camForward)
+  let worldMoveX = 0, worldMoveZ = 0;
+  if (moving) {
+    worldMoveX = camRight.x * mx + camForward.x * (-mz);
+    worldMoveZ = camRight.z * mx + camForward.z * (-mz);
+
+    // Calculate target rotation from world movement direction
+    // Cat's head faces -Z in local space, so target angle needs PI offset
+    const targetAngle = Math.atan2(worldMoveX, worldMoveZ) + Math.PI;
+    // Smooth rotation
+    let diff = targetAngle - klausState.rotation;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    klausState.rotation += diff * TURN_SPEED * delta;
+  }
+
+  // Apply movement in the direction Klaus is facing
+  if (moving) {
+    const moveLen = Math.min(1, inputMag);
+    klaus.position.x -= Math.sin(klausState.rotation) * speed * moveLen * delta;
+    klaus.position.z -= Math.cos(klausState.rotation) * speed * moveLen * delta;
+  }
+
+  // Clamp to world bounds
+  klaus.position.x = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, klaus.position.x));
+  klaus.position.z = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, klaus.position.z));
+
+  // Terrain height
+  const terrainY = getTerrainHeight(klaus.position.x, klaus.position.z);
+
+  // Poop action
+  if (input.poop && !isPooping) {
+    doPoopAction();
+  }
+  input.poop = false; // consume poop input
+
+  // Update dramatic multi-phase poop animation
+  if (isPooping) {
+    poopAnimTimer -= delta;
+    const poopProgress = 1 - (poopAnimTimer / POOP_ANIM_DURATION);
+    // p: 0.0-0.2 = alarm, 0.2-0.7 = strain, 0.7-0.85 = peak, 0.85-1.0 = relief
+    
+    // Body squat envelope
+    let squat;
+    if (poopProgress < 0.2) {
+      squat = (poopProgress / 0.2) * 0.3; // slight crouch
+    } else if (poopProgress < 0.7) {
+      squat = 0.3 + ((poopProgress - 0.2) / 0.5) * 0.7; // deep squat
+    } else if (poopProgress < 0.85) {
+      squat = 1.0; // maximum squat
+    } else {
+      squat = 1.0 - ((poopProgress - 0.85) / 0.15); // spring back up
+    }
+    
+    // Squat animation: lower body, spread back legs
+    body.position.y = 1.8 - squat * 1.0;
+    legBL.rotation.x = squat * 0.7;
+    legBR.rotation.x = squat * 0.7;
+    legFL.rotation.x = -squat * 0.3;
+    legFR.rotation.x = -squat * 0.3;
+    // Tail goes rigid and straight up
+    tailGroup.rotation.x = -squat * 1.5;
+    for (let i = 0; i < tailSegments.length; i++) {
+      tailSegments[i].rotation.x = -squat * 0.3;
+      tailSegments[i].rotation.y = 0;
+    }
+    // Ears flatten hard
+    earL.rotation.z = -0.2 - squat * 0.5;
+    earR.rotation.z = 0.2 + squat * 0.5;
+    
+    // === FACIAL EXPRESSIONS ===
+    // Trembling intensity increases through phases
+    let tremble = 0;
+    if (poopProgress < 0.2) {
+      tremble = 0.02;
+    } else if (poopProgress < 0.7) {
+      tremble = 0.04 + ((poopProgress - 0.2) / 0.5) * 0.06;
+    } else if (poopProgress < 0.85) {
+      tremble = 0.12; // maximum shake
+    } else {
+      tremble = 0.02;
+    }
+    
+    // Body tremble
+    klaus.position.x += (Math.random() - 0.5) * tremble;
+    klaus.position.z += (Math.random() - 0.5) * tremble;
+    
+    // Eyes go wide (scale up)
+    const eyeScale = poopProgress < 0.85 ? 1 + squat * 0.6 : 1 + (1 - squat) * 0.3;
+    eyeL.scale.set(eyeScale, eyeScale, eyeScale);
+    eyeR.scale.set(eyeScale, eyeScale, eyeScale);
+    
+    // Pupils shrink (tiny dots = straining)
+    let pupilScale;
+    if (poopProgress >= 0.7 && poopProgress < 0.85) {
+      // Peak: eyes squeeze shut
+      pupilScale = 2.0; // pupils expand to fill eyes (squinting)
+      eyeL.scale.set(1.0, 0.3, 1.0); // squished = squinting
+      eyeR.scale.set(1.0, 0.3, 1.0);
+    } else if (poopProgress >= 0.85) {
+      // Relief: eyes pop open wide
+      pupilScale = 0.4;
+      eyeL.scale.set(1.5, 1.5, 1.5);
+      eyeR.scale.set(1.5, 1.5, 1.5);
+    } else {
+      pupilScale = 1.0 - squat * 0.6; // shrink as strain increases
+    }
+    pupilL.scale.set(pupilScale, pupilScale, pupilScale);
+    pupilR.scale.set(pupilScale, pupilScale, pupilScale);
+    
+    // Pupils vibrate/shake during strain
+    if (poopProgress > 0.2 && poopProgress < 0.85) {
+      const shake = tremble * 2;
+      pupilL.position.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, -0.2);
+      pupilR.position.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, -0.2);
+    } else {
+      pupilL.position.set(0, 0, -0.2);
+      pupilR.position.set(0, 0, -0.2);
+    }
+    
+    // Mouth opens wider as strain increases
+    if (poopProgress < 0.85) {
+      const mouthOpen = squat;
+      mouth.scale.set(1.2 + mouthOpen * 0.8, 0.8 + mouthOpen * 1.2, 0.5 + mouthOpen * 0.3);
+      mouth.position.y = -0.15 - mouthOpen * 0.1;
+    } else {
+      // Relief: mouth closes to a smile shape
+      mouth.scale.set(1.5, 0.4, 0.5);
+      mouth.position.y = -0.15;
+    }
+    
+    // Sweat drops animate (drip down)
+    if (sweatL.visible) {
+      const drip = Math.sin(elapsed * 8) * 0.1;
+      sweatL.position.y = 0.8 - poopProgress * 0.4 + drip;
+      sweatR.position.y = 0.8 - poopProgress * 0.4 - drip;
+      sweatL.scale.y = 1.3 + poopProgress * 0.5;
+      sweatR.scale.y = 1.3 + poopProgress * 0.5;
+    }
+    
+    if (poopAnimTimer <= 0) {
+      isPooping = false;
+      poopAnimTimer = 0;
+      poopPhase = 0;
+      tailGroup.rotation.x = -0.4; // restore default upward hold angle
+      // Reset ear positions
+      earL.rotation.z = -0.2;
+      earR.rotation.z = 0.2;
+      finishPoop();
+    }
+  }
+
+  // Eat / Pounce
+  if (input.eat && !isPooping) {
+    tryEatButterfly();
+  }
+  input.eat = false; // consume eat input
+
+  // Update eat animation timer
+  if (eatAnimTimer > 0) {
+    eatAnimTimer -= delta;
+    // Head lunge forward animation (dip head down and forward)
+    const eatProgress = 1 - (eatAnimTimer / EAT_ANIM_DURATION);
+    const lunge = Math.sin(eatProgress * Math.PI); // 0 -> 1 -> 0
+    head.position.z = -2.2 - lunge * 0.8; // lunge forward
+    head.position.y = 0.6 - lunge * 0.5;  // dip down
+    head.rotation.x = lunge * 0.4;        // tilt down
+    // Crouch body slightly
+    body.position.y = 1.8 - lunge * 0.3;
+    // Front legs reach forward
+    legFL.rotation.x = -lunge * 0.6;
+    legFR.rotation.x = -lunge * 0.6;
+  } else {
+    // Reset head position when not eating (will be overridden by walk anim if moving)
+    head.position.z = -2.2;
+    head.position.y = 0.6;
+    head.rotation.x = 0;
+  }
+
+  // Jump
+  if (input.jump && !klausState.isJumping) {
+    klausState.isJumping = true;
+    klausState.jumpVelocity = JUMP_FORCE;
+  }
+  input.jump = false; // consume jump input
+
+  if (klausState.isJumping) {
+    klausState.jumpVelocity -= GRAVITY * delta;
+    klaus.position.y += klausState.jumpVelocity * delta;
+    if (klaus.position.y <= terrainY + KLAUS_GROUND_OFFSET) {
+      klaus.position.y = terrainY + KLAUS_GROUND_OFFSET;
+      klausState.isJumping = false;
+      klausState.jumpVelocity = 0;
+    }
+  } else {
+    klaus.position.y = terrainY + KLAUS_GROUND_OFFSET;
+  }
+
+  // Apply rotation
+  klaus.rotation.y = klausState.rotation;
+
+  // Walk cycle animation (legs)
+  if (moving && !klausState.isJumping) {
+    const cycleSpeed = isZooming ? 35 : (input.sprint ? 18 : 10);
+    klausState.walkCycle += delta * cycleSpeed;
+    const swingAmp = isZooming ? 0.7 : 0.4;
+    const swing = Math.sin(klausState.walkCycle) * swingAmp;
+    legFL.rotation.x = swing;
+    legBR.rotation.x = swing;
+    legFR.rotation.x = -swing;
+    legBL.rotation.x = -swing;
+    // Subtle body bob
+    body.position.y = 1.8 + Math.abs(Math.sin(klausState.walkCycle * 2)) * 0.1;
+  } else {
+    // Idle - reset legs
+    legFL.rotation.x *= 0.9;
+    legFR.rotation.x *= 0.9;
+    legBL.rotation.x *= 0.9;
+    legBR.rotation.x *= 0.9;
+    body.position.y = 1.8;
+  }
+
+  // Tail animation - natural cat tail with S-curve wave propagation
+  if (!isPooping && !isDisgusted && !isLovingMushroom) {
+    // Reset base angle (may have been changed by poop anim)
+    tailGroup.rotation.x = -0.4; // default upward hold
+    
+    for (let i = 0; i < tailSegments.length; i++) {
+      const t = i / (tailSegments.length - 1); // 0=base, 1=tip
+      
+      if (moving) {
+        // Walking/running: tail held up with a gentle S-curve sway
+        // Wave propagates from base to tip with increasing amplitude
+        const tailSpeed = input.sprint ? 6 : 3.5;
+        const baseAmp = input.sprint ? 0.08 : 0.05;
+        const tipAmp = input.sprint ? 0.35 : 0.22;
+        const amp = THREE.MathUtils.lerp(baseAmp, tipAmp, t);
+        
+        // S-curve: each segment is phase-offset from the previous
+        // creating a wave that travels along the tail
+        const phase = elapsed * tailSpeed - i * 0.35;
+        
+        // Vertical curl: slight upward curve that relaxes toward tip
+        const curlUp = (1 - t) * -0.12; // base segments curl up more
+        
+        // Side-to-side sway (primary motion)
+        tailSegments[i].rotation.y = Math.sin(phase) * amp;
+        // Vertical wave (secondary, smaller motion) + natural curl
+        tailSegments[i].rotation.x = curlUp + Math.sin(phase * 0.8 + 1.2) * amp * 0.3;
+      } else {
+        // Idle: slow, elegant sway - classic "content cat" tail movement
+        // Tail curves gently upward then the tip curls and sways lazily
+        const idleSpeed = 1.5;
+        const phase = elapsed * idleSpeed - i * 0.38;
+        
+        // Gentle upward curl along the length
+        const curlUp = (1 - t) * -0.1;
+        
+        // Tip sways more than base (lazy pendulum effect)
+        const swayAmp = THREE.MathUtils.lerp(0.02, 0.18, t * t); // quadratic = tip-heavy
+        
+        // Primary: slow side-to-side
+        tailSegments[i].rotation.y = Math.sin(phase) * swayAmp;
+        // Secondary: very subtle vertical bob + curl
+        tailSegments[i].rotation.x = curlUp + Math.sin(phase * 0.6 + 0.8) * swayAmp * 0.25;
+        
+        // Occasional "flick" at the tip (every ~4 seconds)
+        if (i >= tailSegments.length - 4) {
+          const flickCycle = Math.sin(elapsed * 0.25) > 0.85 ? 1 : 0;
+          const flickPhase = (elapsed % 4) * 3;
+          if (flickCycle && flickPhase < Math.PI) {
+            const flickAmp = Math.sin(flickPhase) * 0.3 * (t * t);
+            tailSegments[i].rotation.y += flickAmp;
+          }
+        }
+      }
+    }
+  }
+
+  // Ear twitch (only when not in a special animation that controls ears)
+  if (!isPooping && !isDisgusted && !isZooming && !isLovingMushroom) {
+    earL.rotation.z = -0.2 + Math.sin(elapsed * 1.5) * 0.05;
+    earR.rotation.z = 0.2 + Math.cos(elapsed * 1.3) * 0.05;
+  }
+
+  // Update sun shadow to follow Klaus
+  sunLight.position.set(klaus.position.x + 50, 80, klaus.position.z + 30);
+  sunLight.target.position.copy(klaus.position);
+  sunLight.target.updateMatrixWorld();
+
+  // Reset input for next frame (gamepad will re-set)
+  if (!navigator.getGamepads()[0]) {
+    // Only reset if no gamepad (keyboard handles via keysDown)
+  }
+}
+
+// Poop camera state
+let poopCamBlend = 0; // 0 = normal cam, 1 = face cam
+let poopCamAngle = 0; // tracks the orbit angle during poop transition
+
+function updateCamera(delta) {
+  if (gameState !== 'playing') return;
+
+  // Blend mushroom love camera in/out
+  if (isLovingMushroom) {
+    mushroomLoveCamBlend = Math.min(1, mushroomLoveCamBlend + delta * 2.5);
+  } else {
+    mushroomLoveCamBlend = Math.max(0, mushroomLoveCamBlend - delta * 2);
+  }
+
+  // Blend disgust camera in/out (same orbit-to-face as poop)
+  if (isDisgusted) {
+    disgustCamBlend = Math.min(1, disgustCamBlend + delta * 2.5);
+  } else {
+    disgustCamBlend = Math.max(0, disgustCamBlend - delta * 2);
+  }
+
+  // Blend poop camera in/out
+  if (isPooping) {
+    poopCamBlend = Math.min(1, poopCamBlend + delta * 2.5); // zoom in over ~0.4s
+  } else {
+    poopCamBlend = Math.max(0, poopCamBlend - delta * 2); // zoom out over ~0.5s
+  }
+
+  // Combine poop, disgust, and mushroom love camera blends (all orbit to face)
+  const combinedCamBlend = Math.max(poopCamBlend, disgustCamBlend, mushroomLoveCamBlend);
+  // Smoothstep for nice easing
+  const t = combinedCamBlend * combinedCamBlend * (3 - 2 * combinedCamBlend);
+
+  // Normal camera: behind Klaus (angle 0 = behind)
+  // The normal cam sits at rotation angle 0 (behind), face cam orbits to PI (in front)
+  // We orbit the camera around Klaus from behind (0) to in front (PI)
+  const orbitAngle = t * Math.PI; // 0 to PI as we blend
+
+  // Distance blends from far (normal) to medium close (face)
+  const dist = CAM_DISTANCE + (8 - CAM_DISTANCE) * t; // 12 -> 8
+  const height = CAM_HEIGHT + (3.0 - CAM_HEIGHT) * t;  // 6 -> 3.0 (slightly above face level)
+
+  // Camera orbits around Klaus
+  // Normal: behind = +sin(rot), +cos(rot)
+  // Face: in front = -sin(rot), -cos(rot) (that's orbit by PI)
+  const camAngle = klausState.rotation + orbitAngle;
+  const targetX = klaus.position.x + Math.sin(camAngle) * dist;
+  const targetZ = klaus.position.z + Math.cos(camAngle) * dist;
+  const targetY = klaus.position.y + height;
+
+  // Smooth follow (faster during poop for snappy feel)
+  const smoothSpeed = CAM_SMOOTH * (1 + t * 2); // gets faster as we zoom in
+  camera.position.x += (targetX - camera.position.x) * smoothSpeed * delta;
+  camera.position.y += (targetY - camera.position.y) * smoothSpeed * delta;
+  camera.position.z += (targetZ - camera.position.z) * smoothSpeed * delta;
+
+  // Look target: blend between body center and face
+  const normalLookY = klaus.position.y + CAM_LOOK_HEIGHT;
+  const faceLookY = klaus.position.y + 2.2; // look at face height
+  const lookTarget = new THREE.Vector3(
+    klaus.position.x,
+    normalLookY + (faceLookY - normalLookY) * t,
+    klaus.position.z
+  );
+  camera.lookAt(lookTarget);
+
+  // FOV: poop narrows, zoomies widen
+  const normalFOV = 60;
+  const poopFOV = 35;
+  const zoomieFOV = 85; // wide = speed feel
+  let targetFOV = normalFOV + (poopFOV - normalFOV) * t;
+  if (isZooming) {
+    targetFOV = zoomieFOV;
+  }
+  camera.fov += (targetFOV - camera.fov) * 6 * delta;
+  camera.updateProjectionMatrix();
+
+  // Zoomie camera: pull back further and add shake
+  if (isZooming) {
+    const shake = 0.3;
+    camera.position.x += (Math.random() - 0.5) * shake;
+    camera.position.y += (Math.random() - 0.5) * shake * 0.5;
+    camera.position.z += (Math.random() - 0.5) * shake;
+  }
+}
+
+// ============================================================
+// RESIZE HANDLER
+// ============================================================
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 0.05); // cap delta
+  const elapsed = clock.getElapsedTime();
+
+  // Poll inputs
+  handleGamepadFull();
+  updateKeyboardInput();
+
+  // Update game
+  updateKlaus(delta, elapsed);
+  updateMushroomLoveAnimation(delta, elapsed);
+  updateDisgustAnimation(delta, elapsed);
+  updateZoomieMode(delta, elapsed);
+  updateZoomieMeter(delta);
+  updateCamera(delta);
+  updateButterflies(elapsed);
+  updateWorldDetails(elapsed);
+  updateMeters(delta);
+  updatePoopObjects(elapsed);
+
+  // Animate clouds
+  clouds.forEach(cloud => {
+    cloud.position.x += cloud.userData.speed;
+    if (cloud.position.x > WORLD_SIZE) cloud.position.x = -WORLD_SIZE;
+  });
+
+  // Render
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
