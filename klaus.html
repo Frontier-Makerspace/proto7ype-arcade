@@ -490,7 +490,7 @@ scene.add(hemiLight);
 const WORLD_SIZE = 160;
 
 // Main grass plane
-const grassGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
+const grassGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 128, 128);
 // Add gentle hills
 const grassVerts = grassGeo.attributes.position;
 for (let i = 0; i < grassVerts.count; i++) {
@@ -716,7 +716,7 @@ const legFR = createLeg(0.7, -1.2);  // front right
 const legBL = createLeg(-0.7, 1.2);  // back left
 const legBR = createLeg(0.7, 1.2);   // back right
 
-// Tail - long fluffy cat tail with many segments for fluid curves
+// Tail - smooth, long, elegant cat tail with many segments for fluid curves
 const tailSegments = [];
 const tailGroup = new THREE.Group();
 tailGroup.position.set(0, 0.3, 1.75);
@@ -724,21 +724,20 @@ tailGroup.position.set(0, 0.3, 1.75);
 tailGroup.rotation.x = -0.4;
 body.add(tailGroup);
 
-const TAIL_SEG_COUNT = 14;
-const TAIL_LENGTH = 4.5; // longer tail
+const TAIL_SEG_COUNT = 16;
+const TAIL_LENGTH = 5.0; // nice long kitty tail
 const segLength = TAIL_LENGTH / TAIL_SEG_COUNT;
 
-// Fluffy fur material (slightly lighter than body for depth)
-const fluffFur = new THREE.MeshLambertMaterial({ color: 0x222222 });
-
 for (let i = 0; i < TAIL_SEG_COUNT; i++) {
-  // Taper: thick at base, thin at tip - but overall much thicker for fluffiness
+  // Smooth taper: thick at base, thin at tip
   const t = i / (TAIL_SEG_COUNT - 1); // 0 at base, 1 at tip
-  const radiusTop = THREE.MathUtils.lerp(0.30, 0.10, Math.min(1, (i + 1) / (TAIL_SEG_COUNT - 1)));
-  const radiusBottom = THREE.MathUtils.lerp(0.30, 0.10, t);
+  const tNext = Math.min(1, (i + 1) / (TAIL_SEG_COUNT - 1));
+  // Use a smooth curve for tapering - starts thick, tapers gracefully
+  const radiusBottom = THREE.MathUtils.lerp(0.22, 0.04, t * t); // quadratic taper
+  const radiusTop = THREE.MathUtils.lerp(0.22, 0.04, tNext * tNext);
   
-  // Use cylinder geometry for round, smooth segments
-  const segGeo = new THREE.CylinderGeometry(radiusTop, radiusBottom, segLength, 8, 1);
+  // Use cylinder geometry with more radial segments for smoothness
+  const segGeo = new THREE.CylinderGeometry(radiusTop, radiusBottom, segLength, 10, 1);
   // Rotate so cylinder extends along Z axis instead of Y
   segGeo.rotateX(Math.PI / 2);
   // Shift geometry so pivot is at the base of each segment
@@ -746,28 +745,6 @@ for (let i = 0; i < TAIL_SEG_COUNT; i++) {
   
   const seg = new THREE.Mesh(segGeo, blackFur);
   seg.castShadow = true;
-  
-  // Add fluffy fur puffs - overlapping spheres that stick out around the cylinder
-  // More puffs in the middle, fewer at base and tip
-  const fluffiness = Math.sin(t * Math.PI) * 0.8 + 0.4; // peaks in middle
-  const puffRadius = THREE.MathUtils.lerp(0.28, 0.12, t) * fluffiness;
-  const puffCount = t < 0.15 ? 2 : (t > 0.9 ? 2 : 3); // fewer at extremes
-  
-  for (let p = 0; p < puffCount; p++) {
-    const puffGeo = new THREE.SphereGeometry(puffRadius, 6, 4);
-    const puff = new THREE.Mesh(puffGeo, fluffFur);
-    // Distribute puffs around the circumference at slightly random positions
-    const angle = (p / puffCount) * Math.PI * 2 + (i * 0.7); // offset per segment for variety
-    const outward = THREE.MathUtils.lerp(0.12, 0.04, t); // how far puffs stick out
-    puff.position.set(
-      Math.cos(angle) * outward,
-      Math.sin(angle) * outward,
-      segLength * (0.3 + Math.random() * 0.4) // spread along segment length
-    );
-    puff.scale.set(1, 1, 1.3); // slightly elongated along tail direction
-    puff.castShadow = true;
-    seg.add(puff);
-  }
   
   if (i === 0) {
     tailGroup.add(seg);
@@ -779,20 +756,13 @@ for (let i = 0; i < TAIL_SEG_COUNT; i++) {
   tailSegments.push(seg);
 }
 
-// Add a big fluffy rounded tip at the very end of the tail
-const tipGeo = new THREE.SphereGeometry(0.14, 8, 6);
+// Small rounded tip at the very end for a clean finish
+const tipGeo = new THREE.SphereGeometry(0.045, 8, 6);
 const tailTip = new THREE.Mesh(tipGeo, blackFur);
 tailTip.position.set(0, 0, segLength);
+tailTip.scale.set(1, 1, 1.5); // slightly elongated for smooth taper
 tailTip.castShadow = true;
 tailSegments[TAIL_SEG_COUNT - 1].add(tailTip);
-
-// Extra fluffy tip tuft
-const tuftGeo = new THREE.SphereGeometry(0.18, 6, 4);
-const tailTuft = new THREE.Mesh(tuftGeo, fluffFur);
-tailTuft.position.set(0, 0, segLength * 0.8);
-tailTuft.scale.set(1.1, 1.1, 1.4);
-tailTuft.castShadow = true;
-tailSegments[TAIL_SEG_COUNT - 1].add(tailTuft);
 
 // Position Klaus in the world
 klaus.position.set(0, 0, 0);
