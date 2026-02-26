@@ -1107,6 +1107,263 @@ for (let i = 0; i < 20; i++) {
   lavenderPlants.push(createLavender(x, z));
 }
 
+// --- HAMSTER WHEEL ---
+const WHEEL_RADIUS = 5;        // inner radius of the wheel
+const WHEEL_WIDTH = 3.5;       // how wide (deep) the wheel is
+const WHEEL_ENTER_RANGE = 5;   // how close Klaus needs to be to auto-enter
+const WHEEL_POS = { x: 15, z: -10 }; // placed near spawn, easy to find
+
+let hamsterWheelGroup;          // the whole wheel assembly
+let wheelDrum;                  // the spinning drum part
+let wheelRotation = 0;          // current rotation of the drum
+let klausInWheel = false;       // is Klaus currently in the wheel?
+let wheelEnterCooldown = 0;     // cooldown to prevent instant re-enter after exit
+
+function createHamsterWheel() {
+  const h = getTerrainHeight(WHEEL_POS.x, WHEEL_POS.z);
+  hamsterWheelGroup = new THREE.Group();
+  hamsterWheelGroup.position.set(WHEEL_POS.x, h, WHEEL_POS.z);
+  
+  // Materials
+  const metalMat = new THREE.MeshLambertMaterial({ color: 0xAAAAAA });
+  const metalDark = new THREE.MeshLambertMaterial({ color: 0x777777 });
+  const woodMat = new THREE.MeshLambertMaterial({ color: 0xDEB887 });
+  const runnerMat = new THREE.MeshLambertMaterial({ color: 0xCD853F });
+  
+  // === SUPPORT FRAME (A-frame stands on each side) ===
+  function createAFrame(zOffset) {
+    const frame = new THREE.Group();
+    // Two angled legs
+    const legGeo = new THREE.CylinderGeometry(0.15, 0.2, WHEEL_RADIUS * 2 + 2, 8);
+    
+    const legL = new THREE.Mesh(legGeo, metalMat);
+    legL.position.set(-1.5, WHEEL_RADIUS, 0);
+    legL.rotation.z = 0.2;
+    legL.castShadow = true;
+    frame.add(legL);
+    
+    const legR = new THREE.Mesh(legGeo, metalMat);
+    legR.position.set(1.5, WHEEL_RADIUS, 0);
+    legR.rotation.z = -0.2;
+    legR.castShadow = true;
+    frame.add(legR);
+    
+    // Cross bar at top
+    const crossGeo = new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8);
+    const cross = new THREE.Mesh(crossGeo, metalDark);
+    cross.position.set(0, WHEEL_RADIUS * 2 + 0.5, 0);
+    cross.rotation.z = Math.PI / 2;
+    cross.castShadow = true;
+    frame.add(cross);
+    
+    frame.position.z = zOffset;
+    return frame;
+  }
+  
+  const frameNear = createAFrame(-WHEEL_WIDTH / 2 - 0.3);
+  const frameFar = createAFrame(WHEEL_WIDTH / 2 + 0.3);
+  hamsterWheelGroup.add(frameNear);
+  hamsterWheelGroup.add(frameFar);
+  
+  // Axle (horizontal bar through center)
+  const axleGeo = new THREE.CylinderGeometry(0.12, 0.12, WHEEL_WIDTH + 2, 8);
+  const axle = new THREE.Mesh(axleGeo, metalDark);
+  axle.position.set(0, WHEEL_RADIUS + 0.5, 0);
+  axle.rotation.x = Math.PI / 2;
+  axle.castShadow = true;
+  hamsterWheelGroup.add(axle);
+  
+  // === SPINNING DRUM (the wheel itself) ===
+  wheelDrum = new THREE.Group();
+  wheelDrum.position.set(0, WHEEL_RADIUS + 0.5, 0);
+  
+  // Outer ring rungs - the bars that form the cylindrical cage
+  const RUNG_COUNT = 24;
+  const rungGeo = new THREE.CylinderGeometry(0.06, 0.06, WHEEL_WIDTH, 6);
+  for (let i = 0; i < RUNG_COUNT; i++) {
+    const angle = (i / RUNG_COUNT) * Math.PI * 2;
+    const rung = new THREE.Mesh(rungGeo, woodMat);
+    rung.position.set(
+      Math.cos(angle) * WHEEL_RADIUS,
+      Math.sin(angle) * WHEEL_RADIUS,
+      0
+    );
+    rung.rotation.x = Math.PI / 2;
+    rung.castShadow = true;
+    wheelDrum.add(rung);
+  }
+  
+  // Two rim rings (circles on each side)
+  function createRimRing(zPos) {
+    const rimGroup = new THREE.Group();
+    const RIM_SEGMENTS = 32;
+    const rimSegGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.98, 6);
+    for (let i = 0; i < RIM_SEGMENTS; i++) {
+      const a1 = (i / RIM_SEGMENTS) * Math.PI * 2;
+      const a2 = ((i + 1) / RIM_SEGMENTS) * Math.PI * 2;
+      const mx = (Math.cos(a1) + Math.cos(a2)) / 2 * WHEEL_RADIUS;
+      const my = (Math.sin(a1) + Math.sin(a2)) / 2 * WHEEL_RADIUS;
+      const seg = new THREE.Mesh(rimSegGeo, metalMat);
+      seg.position.set(mx, my, zPos);
+      seg.rotation.z = a1 + Math.PI / RIM_SEGMENTS;
+      seg.castShadow = true;
+      rimGroup.add(seg);
+    }
+    return rimGroup;
+  }
+  
+  wheelDrum.add(createRimRing(-WHEEL_WIDTH / 2));
+  wheelDrum.add(createRimRing(WHEEL_WIDTH / 2));
+  
+  // Running surface - flat planks along the inside bottom
+  // These are the "floor" planks that the cat walks on
+  const PLANK_COUNT = 16;
+  const plankGeo = new THREE.BoxGeometry(1.6, 0.08, WHEEL_WIDTH - 0.2);
+  for (let i = 0; i < PLANK_COUNT; i++) {
+    const angle = (i / PLANK_COUNT) * Math.PI * 2;
+    const plank = new THREE.Mesh(plankGeo, runnerMat);
+    plank.position.set(
+      Math.cos(angle) * (WHEEL_RADIUS - 0.15),
+      Math.sin(angle) * (WHEEL_RADIUS - 0.15),
+      0
+    );
+    plank.rotation.z = angle;
+    plank.receiveShadow = true;
+    wheelDrum.add(plank);
+  }
+  
+  // Spoke supports (cross bars connecting axle to rim)
+  const SPOKE_COUNT = 6;
+  for (let side = -1; side <= 1; side += 2) {
+    const spokeZ = side * (WHEEL_WIDTH / 2 - 0.1);
+    for (let i = 0; i < SPOKE_COUNT; i++) {
+      const angle = (i / SPOKE_COUNT) * Math.PI * 2;
+      const spokeLen = WHEEL_RADIUS - 0.3;
+      const spokeGeo = new THREE.CylinderGeometry(0.05, 0.05, spokeLen, 4);
+      const spoke = new THREE.Mesh(spokeGeo, metalDark);
+      spoke.position.set(
+        Math.cos(angle) * spokeLen / 2,
+        Math.sin(angle) * spokeLen / 2,
+        spokeZ
+      );
+      spoke.rotation.z = angle + Math.PI / 2;
+      wheelDrum.add(spoke);
+    }
+  }
+  
+  hamsterWheelGroup.add(wheelDrum);
+  
+  // Small sign/label
+  const signGeo = new THREE.BoxGeometry(2.5, 0.8, 0.1);
+  const signMat = new THREE.MeshLambertMaterial({ color: 0xFFF8DC });
+  const sign = new THREE.Mesh(signGeo, signMat);
+  sign.position.set(0, 0.5, -WHEEL_WIDTH / 2 - 1.5);
+  sign.castShadow = true;
+  hamsterWheelGroup.add(sign);
+  
+  // Sign post
+  const postGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.0, 4);
+  const post = new THREE.Mesh(postGeo, woodMat);
+  post.position.set(0, 0.1, -WHEEL_WIDTH / 2 - 1.5);
+  hamsterWheelGroup.add(post);
+  
+  scene.add(hamsterWheelGroup);
+}
+
+createHamsterWheel();
+
+function updateHamsterWheel(delta, elapsed) {
+  if (gameState !== 'playing') return;
+  
+  // Cooldown timer
+  if (wheelEnterCooldown > 0) wheelEnterCooldown -= delta;
+  
+  const dx = klaus.position.x - WHEEL_POS.x;
+  const dz = klaus.position.z - WHEEL_POS.z;
+  const distToWheel = Math.sqrt(dx * dx + dz * dz);
+  
+  if (klausInWheel) {
+    // Klaus is in the wheel!
+    const canMove = !isPooping && !isDisgusted && !isLovingMushroom && !isZooming;
+    const mx = canMove ? input.moveX : 0;
+    const mz = canMove ? input.moveZ : 0;
+    const inputMag = Math.sqrt(mx * mx + mz * mz);
+    const walking = inputMag > 0.1;
+    
+    // Keep Klaus positioned inside the wheel (at the bottom center)
+    const wheelH = getTerrainHeight(WHEEL_POS.x, WHEEL_POS.z);
+    klaus.position.x = WHEEL_POS.x;
+    klaus.position.z = WHEEL_POS.z;
+    if (!klausState.isJumping) {
+      klaus.position.y = wheelH + KLAUS_GROUND_OFFSET;
+    }
+    
+    // Face Klaus along the wheel axis (looking along Z)
+    // Smoothly rotate to face along the wheel
+    const wheelFaceAngle = Math.PI; // face -Z direction (toward camera usually)
+    let diff = wheelFaceAngle - klausState.rotation;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    klausState.rotation += diff * 4 * delta;
+    
+    if (walking) {
+      // Spin the wheel based on walking input
+      const walkSpeed = input.sprint ? 4 : 2;
+      wheelRotation += walkSpeed * delta * inputMag;
+      
+      // Walk cycle animation for legs (same as normal walking)
+      const cycleSpeed = input.sprint ? 18 : 10;
+      klausState.walkCycle += delta * cycleSpeed * inputMag;
+      const swingAmp = 0.4;
+      const swing = Math.sin(klausState.walkCycle) * swingAmp;
+      legFL.rotation.x = swing;
+      legBR.rotation.x = swing;
+      legFR.rotation.x = -swing;
+      legBL.rotation.x = -swing;
+      body.position.y = 1.8 + Math.abs(Math.sin(klausState.walkCycle * 2)) * 0.1;
+    } else {
+      // Idle in wheel - slow down legs
+      legFL.rotation.x *= 0.9;
+      legFR.rotation.x *= 0.9;
+      legBL.rotation.x *= 0.9;
+      legBR.rotation.x *= 0.9;
+      body.position.y = 1.8;
+      
+      // Wheel slowly decelerates (friction)
+      // (wheelRotation stays where it is - no momentum for simplicity)
+    }
+    
+    // Apply wheel drum rotation
+    wheelDrum.rotation.z = wheelRotation;
+    
+    // Exit the wheel: jump to get out
+    if (input.jump && !klausState.isJumping) {
+      klausInWheel = false;
+      wheelEnterCooldown = 1.5; // prevent instant re-enter
+      klausState.isJumping = true;
+      klausState.jumpVelocity = JUMP_FORCE * 0.8;
+      // Push Klaus out to the side
+      klaus.position.x += 3;
+      klaus.position.z += 2;
+    }
+    
+  } else {
+    // Not in wheel - check if Klaus walks close enough to enter
+    if (distToWheel < WHEEL_ENTER_RANGE && wheelEnterCooldown <= 0 && !isPooping && !isDisgusted && !isLovingMushroom && !isZooming && !klausState.isJumping) {
+      const mx = input.moveX;
+      const mz = input.moveZ;
+      const inputMag = Math.sqrt(mx * mx + mz * mz);
+      // Only enter if actively walking toward it
+      if (inputMag > 0.3) {
+        klausInWheel = true;
+      }
+    }
+    
+    // Gentle idle wheel sway (wind or just settling)
+    wheelDrum.rotation.z = wheelRotation + Math.sin(elapsed * 0.5) * 0.02;
+  }
+}
+
 // --- BUTTERFLIES ---
 const butterflies = [];
 const butterflyWingMats = [
@@ -2405,8 +2662,8 @@ function updateKlaus(delta, elapsed) {
     hungerSlowdown = 1 - ((hungerMeter - 75) / 25) * 0.5; // 1.0 -> 0.5
   }
 
-  // Can't move while pooping, disgusted, or loving mushroom
-  const canMove = !isPooping && !isDisgusted && !isLovingMushroom;
+  // Can't move while pooping, disgusted, loving mushroom, or in hamster wheel
+  const canMove = !isPooping && !isDisgusted && !isLovingMushroom && !klausInWheel;
 
   // Zoomie mode overrides speed and movement
   const baseSpeed = isZooming ? ZOOMIE_SPEED : (input.sprint ? SPRINT_SPEED : WALK_SPEED);
@@ -2835,6 +3092,7 @@ function animate() {
   updateKeyboardInput();
 
   // Update game
+  updateHamsterWheel(delta, elapsed);
   updateKlaus(delta, elapsed);
   updateMushroomLoveAnimation(delta, elapsed);
   updateDisgustAnimation(delta, elapsed);
