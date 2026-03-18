@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦇 Dance Dance — Rhythm Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <div class="start-content">
+            <h1 class="title">🦇 DANCE DANCE 💀</h1>
+            <p class="subtitle">Ride the wave — flow across 4 lanes to the beat</p>
+
+            <div class="instructions">
+                <div class="lane-group">
+                    <div class="lane-group-label">← LEFT HAND</div>
+                    <div class="lane-keys">
+                        <div class="instruction-lane" style="--lane-color: #cc3344;">
+                            <span class="key-badge">A</span>
+                            <span class="lane-label">Left</span>
+                        </div>
+                        <div class="instruction-lane" style="--lane-color: #ff33aa;">
+                            <span class="key-badge">S</span>
+                            <span class="lane-label">Center-L</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="lane-group">
+                    <div class="lane-group-label">RIGHT HAND →</div>
+                    <div class="lane-keys">
+                        <div class="instruction-lane" style="--lane-color: #00e673;">
+                            <span class="key-badge">K</span>
+                            <span class="lane-label">Center-R</span>
+                        </div>
+                        <div class="instruction-lane" style="--lane-color: #0099ff;">
+                            <span class="key-badge">L</span>
+                            <span class="lane-label">Right</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="tip">⛓️ Hit combos to unlock dark power ⚡ &nbsp; | &nbsp; 📷 Use OBSBOT/webcam to dance!</p>
+
+            <div class="mode-buttons">
+                <button id="start-webcam-btn" class="gold-btn">📷 WEBCAM / OBSBOT</button>
+                <button id="start-sim-btn" class="gold-btn sim-btn">⌨️ KEYBOARD MODE</button>
+            </div>
+
+            <div id="camera-select-container" class="camera-select-container hidden">
+                <label for="camera-select" class="camera-select-label">📹 Camera:</label>
+                <select id="camera-select" class="camera-select">
+                    <option value="">Detecting cameras...</option>
+                </select>
+            </div>
+
+            <div id="camera-status" class="camera-status"></div>
+
+            <div class="controls-hint hidden" id="controls-hint">
+                <p>⌨️ <strong>A S</strong> = Left lanes &nbsp;|&nbsp; <strong>K L</strong> = Right lanes &nbsp;|&nbsp; <strong>1-4</strong> or <strong>← →</strong> also work</p>
+            </div>
+
+            <div class="camera-tips">
+                <p class="camera-tip">📷 <strong>OBSBOT users:</strong> Disable auto-tracking for best results. Stand 6-8 feet from camera so your full body is visible.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Song Select Screen -->
+    <div id="song-select-screen" class="screen hidden">
+        <div class="song-select-content">
+            <h2 class="song-select-title">⛧ SELECT YOUR RITUAL ⛧</h2>
+            <div id="song-cards" class="song-cards">
+                <!-- Populated dynamically by game.js -->
+            </div>
+            <div class="song-select-controls">
+                <button id="start-song-btn" class="gold-btn">▶ ENTER THE VOID</button>
+            </div>
+            <p class="song-select-hint">Use ← → to browse, Enter to start, Esc to go back</p>
+        </div>
+    </div>
+
+    <!-- Countdown Screen -->
+    <div id="countdown-screen" class="screen hidden">
+        <div id="countdown-number" class="countdown-number">3</div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen hidden">
+        <canvas id="game-canvas"></canvas>
+        <!-- Music Video (hidden, drawn to canvas) -->
+        <video id="music-video" preload="auto" style="display:none;"></video>
+        <!-- HUD -->
+        <div id="hud">
+            <div id="score-display">
+                <span class="hud-label">SCORE</span>
+                <span id="score-value">0</span>
+            </div>
+            <div id="combo-display">
+                <span class="hud-label">COMBO</span>
+                <span id="combo-value">0x</span>
+            </div>
+            <div id="health-bar-container">
+                <div id="health-bar"></div>
+            </div>
+            <div id="wealth-level">
+                <span id="wealth-text">🦇 Acolyte</span>
+            </div>
+            <div id="song-info-hud">
+                <span id="song-title-hud" class="song-title-hud"></span>
+            </div>
+        </div>
+        <!-- Lane indicator -->
+        <div id="lane-indicator" class="hidden">
+            <span id="current-lane">CENTER-LEFT</span>
+        </div>
+        <!-- Hit feedback -->
+        <div id="hit-feedback" class="hidden"></div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="results-screen" class="screen hidden">
+        <div class="results-content">
+            <h1 class="results-title">☠️ VERDICT ☠️</h1>
+            <div id="final-wealth-title" class="wealth-title"></div>
+            <div class="results-stats">
+                <div class="stat">
+                    <span class="stat-label">Score</span>
+                    <span id="final-score" class="stat-value">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Max Combo</span>
+                    <span id="final-combo" class="stat-value">0x</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Perfect</span>
+                    <span id="final-perfect" class="stat-value perfect-stat">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Good</span>
+                    <span id="final-good" class="stat-value good-stat">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Miss</span>
+                    <span id="final-miss" class="stat-value miss-stat">0</span>
+                </div>
+            </div>
+            <div class="results-buttons">
+                <button id="play-again-btn" class="gold-btn">🔄 DANCE AGAIN</button>
+                <button id="restart-btn" class="gold-btn sim-btn">⛧ SONG SELECT</button>
+            </div>
+        </div>
+    </div>
+
+    <video id="webcam" autoplay playsinline style="display:none;"></video>
+
+    <!-- MediaPipe Pose -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js"></script>
+
+    <script src="pose.js"></script>
+    <script src="ar.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
